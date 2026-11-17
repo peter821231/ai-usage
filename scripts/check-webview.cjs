@@ -220,6 +220,15 @@ const server = http.createServer((req, res) => {
     }
     await page.setViewportSize({ width: 390, height: 1000 });
     await captureDemo('dashboard-demo-status-settings');
+    if (process.argv.includes('--docs')) {
+        await page.locator('.settings').evaluate((node, version) => {
+            const label = document.createElement('p');
+            label.className = 'detail';
+            label.textContent = `DEMO DATA · v${version} · synthetic settings preview`;
+            node.prepend(label);
+        }, require('../package.json').version);
+        await page.locator('.settings').screenshot({ path: root + '/artifacts/documentation-status-settings.png' });
+    }
     await chosen('claudeGptFiveHour').setChecked(true);
     if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'antigravity.statusBar.claudeGptFiveHour' && m.value === true))))
         throw Error('Antigravity summary choice not wired');

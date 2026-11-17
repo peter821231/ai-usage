@@ -10,7 +10,54 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## First version
+## UI preview — 0.1.6
+
+The status bar, dashboard and hover below are maintainer-provided screenshots from
+Antigravity IDE on **2026-11-17**. Values are account-specific snapshots, not live
+readings or fixed budgets. The settings preview is separately labelled synthetic
+**DEMO DATA**; it does not represent a signed-in Pro / Max account test.
+
+### Selected status bar summary
+
+![Actual 0.1.6 status bar showing Gemini 5-hour and weekly, independent Argon weekly, Claude Enterprise spend and Codex limits](docs/images/v0.1.6-status-bar.png)
+
+Gemini **5-hour / Weekly** and **Argon Weekly** are selected by default. Claude/GPT
+can be added in settings; the complete limits remain in the hover and dashboard.
+Status bar width is shared with the IDE and other extensions, so choose the
+summaries that fit your window.
+
+### Detailed dashboard
+
+| Antigravity | Claude Enterprise and Codex |
+| --- | --- |
+| ![Actual Antigravity card with separate Gemini Models, Claude and GPT models, and Gemini 4 Argon groups](docs/images/v0.1.6-antigravity.png) | ![Actual Claude Enterprise account budget and Codex Last recorded cards](docs/images/v0.1.6-claude-codex.png) |
+
+Enterprise spending, remaining budget and the labelled monthly reset rule are
+separate from conversation context. Codex **Last recorded** keeps the original
+event time without treating normal idle time as a yellow warning; read failures
+still warn.
+
+<details>
+<summary>Full hover: all monitored limits, including those omitted from the status bar</summary>
+
+![Actual full hover with independent model groups, usage bars, account spending and source times](docs/images/v0.1.6-hover.png)
+
+</details>
+
+<details>
+<summary>Choose status bar windows — synthetic settings preview</summary>
+
+![Synthetic 0.1.6 settings preview labelled DEMO DATA, with Gemini 5-hour, Gemini Weekly and Argon Weekly selected](docs/images/v0.1.6-settings-demo.png)
+
+Use **Settings → Antigravity** to select individual windows. These choices affect
+only the summary, not provider polling or the full dashboard.
+
+</details>
+
+See [preview provenance and UI highlights](docs/ui-previews.md) for image sources,
+the changes illustrated and instructions to regenerate the synthetic settings view.
+
+## Features
 
 - **Antigravity:** Gemini Models 5-hour and weekly; Claude and GPT models 5-hour
   and weekly; Gemini 4 Argon weekly. Full group identity is preserved even when

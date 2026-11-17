@@ -40,6 +40,7 @@ hover 開頭及 Settings 的 Status Bar 區段均提示「空間有限，只顯�
 - 安裝檔：`artifacts/nexus-ai-usage-0.1.6.vsix`，同一預覽 ID，可覆蓋更新。27 檔、69,959 bytes，SHA-256：`8e7fcd291b336cbc9a664da08219032c90db099887a28b3cba082efe6a273864`。
 - 已核對封裝來源、授權／說明位元組、相對 require、預設選項與 runtime allowlist；沒有 npm runtime 依賴或登入資料。
 - 人工設定預覽已以 DEMO DATA 完成檢視；依交付清理要求，暫存圖片與舊輸出不再保留於 `artifacts`，可用 `test:ui` 重新產生。
+- 正式文件用的[實機截圖與標示清楚的設定模擬圖](ui-previews.md)另存於 `docs/images/`，不占用交付用的 `artifacts`。
 - 功能與測試提交：`c49d393`；文件另作收尾提交。未安裝、未 push。
 
 ## 變更後審查

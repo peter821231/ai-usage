@@ -11,3 +11,8 @@
 !media/main.js
 !media/main.css
 !src/*.js
+!docs/images/v0.1.6-status-bar.png
+!docs/images/v0.1.6-antigravity.png
+!docs/images/v0.1.6-claude-codex.png
+!docs/images/v0.1.6-hover.png
+!docs/images/v0.1.6-settings-demo.png
