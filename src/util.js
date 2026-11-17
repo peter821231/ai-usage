@@ -83,8 +83,17 @@ function contextWindowFor(model) {
 
 function normalizePath(p) {
     let s = String(p || '');
-    try { s = decodeURIComponent(s); } catch (e) { /* keep raw */ }
-    return s.replace(/^file:\/\//i, '').replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '').toLowerCase();
+    try {
+        s = decodeURIComponent(s);
+    } catch (e) {
+        /* keep raw */
+    }
+    return s
+        .replace(/^file:\/\//i, '')
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
 }
 
 function pathsOverlap(a, b) {
@@ -96,13 +105,22 @@ function pathsOverlap(a, b) {
 
 // "Claude and GPT models" or "Claude / GPT-OSS" -> "Claude"; GPT only names a group without Claude.
 function friendlyGroup(name) {
-    const n = String(name || '').toLowerCase();
-    const parts = [['gemini', 'Gemini'], ['claude', 'Claude']].filter(([k]) => n.includes(k)).map(([, v]) => v);
-    if (!parts.length && n.includes('gpt')) parts.push('GPT');
-    return parts.length ? parts.join(' / ') : String(name || '').split(/\s+/)[0];
+    const full = String(name || '').trim();
+    const known = { 'gemini models': 'Gemini', 'claude and gpt models': 'Claude/GPT', 'gemini 4 argon': 'Argon' };
+    return known[full.toLowerCase()] || full;
 }
 
 module.exports = {
-    clampPct, formatCountdown, formatWallClock, formatAgo, formatTokens, maskEmail,
-    textBar, escapeMarkdown, contextWindowFor, normalizePath, pathsOverlap, friendlyGroup
+    clampPct,
+    formatCountdown,
+    formatWallClock,
+    formatAgo,
+    formatTokens,
+    maskEmail,
+    textBar,
+    escapeMarkdown,
+    contextWindowFor,
+    normalizePath,
+    pathsOverlap,
+    friendlyGroup
 };

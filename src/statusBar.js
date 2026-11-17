@@ -1,242 +1,164 @@
 'use strict';
-
 const vscode = require('vscode');
-const { textBar, escapeMarkdown: esc, formatTokens, friendlyGroup } = require('./util');
-
-const FOCUS_CMD = 'quotaNexus.dashboard.focus';
-const TOGGLE_CMD = 'quotaNexus.togglePercentMode';
-const FOOTER = `[Open Quota Nexus](command:${FOCUS_CMD})`;
-const MODE_LINK = `command:${TOGGLE_CMD}`;
-// Short formats carry an arrow: down = left, up = used.
-const MARK = { left: '↓', used: '↑' };
-const OTHER = { left: 'used', used: 'left' };
-// Auto shows every session used this recently, so parallel tools all stay visible.
-const AUTO_RECENT_MS = 15 * 60000;
-const SOURCE = {
-    antigravity: { tag: 'AG', label: 'Antigravity' },
-    claudeCode: { tag: 'CC', label: 'Claude Code' },
-    codex: { tag: 'CX', label: 'Codex' }
-};
-
-function tooltip() {
+const { escapeMarkdown: esc, formatCountdown, textBar } = require('./util');
+const FOCUS = 'nexusAiUsage.dashboard.focus';
+const AG_STATUS_WINDOWS = [
+    { key: 'geminiFiveHour', group: 'Gemini Models', window: '5-hour', default: true },
+    { key: 'geminiWeekly', group: 'Gemini Models', window: 'Weekly', default: true },
+    { key: 'claudeGptFiveHour', group: 'Claude and GPT models', window: '5-hour', default: false },
+    { key: 'claudeGptWeekly', group: 'Claude and GPT models', window: 'Weekly', default: false },
+    { key: 'argonWeekly', group: 'Gemini 4 Argon', window: 'Weekly', default: true }
+];
+const STATUS_SPACE_NOTE =
+    'Status bar space is limited; only selected summaries are shown. All monitored limits remain in this hover and the dashboard.';
+function selectStatusProvider(provider, choices = {}) {
+    if (provider.id !== 'antigravity') return provider;
+    const enabled = AG_STATUS_WINDOWS.filter((choice) =>
+        typeof choices[choice.key] === 'boolean' ? choices[choice.key] : choice.default
+    );
+    return {
+        ...provider,
+        groups: provider.groups
+            .map((group) => ({
+                ...group,
+                rows: group.rows.filter((row) =>
+                    enabled.some((choice) =>
+                        choice.group.toLowerCase() === group.label.trim().toLowerCase() && choice.window === row.label
+                    )
+                )
+            }))
+            .filter((group) => group.rows.length)
+    };
+}
+function amount(value, currency) {
+    return typeof value === 'number' && Number.isFinite(value) ? `${currency || '?'} ${value.toFixed(2)}` : 'Unknown';
+}
+function pct(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 10) / 10}%` : 'Unknown';
+}
+function time(value, zone = 'Asia/Taipei') {
+    return value ? new Date(value).toLocaleString('en-GB', { timeZone: zone }) : 'Unknown';
+}
+function reset(row, zone, now = Date.now()) {
+    return `${time(row.resetAt, zone)}${row.resetAt && !row.resetPending ? ` · in ${formatCountdown(row.resetAt, now)}` : ''}${row.resetBasis === 'event-relative' ? ' · event + interval' : ''}${row.resetBasis === 'official-monthly-rule' ? ' · official monthly rule (00:00 UTC)' : ''}${row.resetPending ? ' · elapsed; awaiting new reading' : ''}`;
+}
+function marker(provider) {
+    const rows = provider.groups.flatMap((g) => g.rows);
+    if (provider.error || provider.spend?.status === 'unsupported') return ' !';
+    if (provider.spend?.stale || rows.some((r) => r.stale && !r.recordedOnly && r.usedPct !== null)) return ' ~';
+    return rows.some((r) => r.usedPct === null) && (!provider.spend || provider.primaryMetric === 'quota') ? ' ?' : '';
+}
+function summary(provider, mode) {
+    if (provider.id === 'claude' && provider.spend && provider.primaryMetric !== 'quota')
+        return `Claude ${amount(provider.spend.used, provider.spend.currency)} / ${provider.spend.limit === null ? 'Unknown' : provider.spend.limit.toFixed(2)}${marker(provider)}`;
+    const values = provider.groups
+        .map((g) => {
+            return `${provider.id === 'antigravity' ? g.short + ' ' : ''}${g.rows.map((r) => `${r.label === 'Weekly' ? 'wk' : r.label === '5-hour' ? '5h' : r.label} ${pct(mode === 'left' ? r.remainingPct : r.usedPct)}`).join(' · ')}`;
+        })
+        .filter(Boolean)
+        .join(' · ');
+    return `${provider.id === 'antigravity' ? 'AG' : provider.id === 'codex' ? 'Codex' : 'Claude'} ${values || 'Unknown'}${marker(provider)}`;
+}
+function progress(value) {
+    return typeof value === 'number' && Number.isFinite(value) ? `\`${textBar(value, 12)}\`` : 'Unknown';
+}
+function compactReset(row, zone, now) {
+    if (!row.resetAt) return 'Unknown';
+    if (row.resetPending) return 'Elapsed · awaiting reading';
+    const wall = new Date(row.resetAt).toLocaleString('en-GB', {
+        timeZone: zone || 'Asia/Taipei',
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    return `${formatCountdown(row.resetAt, now)} (${wall})${row.resetBasis === 'event-relative' ? ' · event + interval' : ''}${row.resetBasis === 'official-monthly-rule' ? ' · official monthly rule (00:00 UTC)' : ''}`;
+}
+function hover(view) {
     const md = new vscode.MarkdownString('', true);
-    md.isTrusted = { enabledCommands: [FOCUS_CMD, TOGGLE_CMD] };
+    md.isTrusted = { enabledCommands: [FOCUS] };
+    const left = view.percentMode === 'left';
+    const main = left ? 'remainingPct' : 'usedPct';
+    const other = left ? 'usedPct' : 'remainingPct';
+    const label = left ? 'Remaining' : 'Used';
+    md.appendMarkdown(`**Nexus AI Usage · ${label.toLowerCase()}**\n\n`);
+    md.appendMarkdown(`${STATUS_SPACE_NOTE}\n\n`);
+    for (const p of view.providers) {
+        const rows = p.groups.flatMap((g) => g.rows);
+        const times = [
+            ...new Set(
+                [...rows.map((r) => r.observedAt), p.spend?.observedAt].filter((t) => typeof t === 'number' && t > 0)
+            )
+        ];
+        md.appendMarkdown(`### ${esc(p.title)}${p.plan ? ` · ${esc(p.plan)}` : ''}\n\n`);
+        md.appendMarkdown(
+            `${esc(p.source)}\n\n${p.id === 'codex' ? 'Source event' : 'Fetched'}: ${times.length === 1 ? esc(time(times[0], view.timeZone)) : times.length ? 'multiple source times; see details' : 'Unknown'}\n\n`
+        );
+        if (p.error) md.appendMarkdown(`**Error: ${esc(p.error)}. Last successful reading, if any, is retained.**\n\n`);
+        if (p.notice) md.appendMarkdown(`${esc(p.notice)}\n\n`);
+        if (rows.some((r) => r.recordedOnly))
+            md.appendMarkdown('**Last recorded:** local Codex event, not a live quota query. Rereading the log does not refresh its source time.\n\n');
+        if (p.spend) {
+            const money = p.spend;
+            md.appendMarkdown(`**${esc(money.title || 'Account budget')}**\n\n`);
+            md.appendMarkdown(
+                `Spent **${esc(amount(money.used, money.currency))}** / limit **${esc(amount(money.limit, money.currency))}**\n\n`
+            );
+            md.appendMarkdown(
+                `${progress(money.usedPct)} **${pct(money.usedPct)} budget used** · Remaining **${esc(amount(money.remaining, money.currency))}**\n\n`
+            );
+            md.appendMarkdown(
+                `${money.stale ? '**Stale** · ' : ''}Reset: ${esc(compactReset(money, view.timeZone, view.now))}${money.enabled === false ? ' · spending disabled' : ''}\n\n`
+            );
+            if (money.issue) md.appendMarkdown(`**${esc(money.issue)}**\n\n`);
+        }
+        if (rows.length) {
+            const grouped = p.id === 'antigravity';
+            md.appendMarkdown(
+                `| ${grouped ? 'Model group | ' : ''}Window | Usage | ${label} | Resets |\n|${grouped ? '---|' : ''}---|---|---|---|\n`
+            );
+            for (const g of p.groups)
+                for (const [index, row] of g.rows.entries()) {
+                    const name = grouped ? `${index === 0 ? `**${esc(g.label)}**` : ''} | ` : '';
+                    md.appendMarkdown(
+                        `| ${name}${esc(row.label)}${row.recordedOnly ? ' (last recorded)' : row.stale && row.usedPct !== null ? ' (stale)' : ''} | ${progress(row[main])} | ${pct(row[main])} (${pct(row[other])} ${left ? 'used' : 'left'}) | ${esc(compactReset(row, view.timeZone, view.now))} |\n`
+                    );
+                }
+            md.appendMarkdown('\n');
+        }
+        if (!p.spend && !rows.length) md.appendMarkdown('Usage unknown. No valid reading yet.\n\n');
+    }
+    md.appendMarkdown(
+        `Times: ${esc(view.timeZone || 'Asia/Taipei')}. ~ stale · ! error · ? missing data.\n\n[Open full details](command:${FOCUS})`
+    );
     return md;
 }
-
-function resetText(w, full) {
-    if (full) return 'not used';
-    if (w.estimated) return 'likely reset';
-    return w.countdown ? `${w.countdown} (${w.wall})` : '';
-}
-
-function stripIcons(s) {
-    return String(s || '').replace(/\$\(/g, '$ (');
-}
-
-function pctOf(x, mode) {
-    return `${x.estimated ? '~' : ''}${x[mode]}%`;
-}
-
-function barPct(x, mode, format) {
-    return pctOf(x, mode) + (format === 'descriptive' ? '' : MARK[mode]);
-}
-
-// One value per model group: its tightest limit (5-hour or weekly), else the pool itself.
-function agItems(a) {
-    if (a.limits && a.limits.length) {
-        return a.limits.map(g => {
-            const w = g.windows.reduce((t, x) => (x.left < t.left ? x : t));
-            return { name: g.short, used: w.used, left: w.left, estimated: w.estimated };
-        });
-    }
-    return a.pools.map(p => ({ ...p, name: friendlyGroup(p.name) }));
-}
-
-function poolsText(items, format, mode) {
-    items = items.map(p => `${p.name} ${barPct(p, mode, format)}`);
-    if (format === 'minimal') return items.join(' | ');
-    if (format === 'compact') return 'AG: ' + items.join(' · ');
-    return `Antigravity: ${items.join(' · ')} ${mode}`;
-}
-
-// Limit windows: first is the short window, the rest prefixed by name.
-function limitText(tool, windows, format, mode) {
-    const name = { CC: 'Claude Code', CX: 'Codex' }[tool];
-    const pct = w => barPct(w, mode, format);
-    const body = windows.map((w, i) => (i === 0 ? pct(w) : `${w.name === 'Weekly' ? 'wk' : w.name} ${pct(w)}`)).join(' · ');
-    if (format === 'minimal') return `${tool} ${body}`;
-    if (format === 'compact') return `${tool}: ${body}`;
-    return `${name}: ${body} ${mode}`;
-}
-
-function heading(mode) {
-    return mode === 'used' ? 'Used' : 'Left';
-}
-
-// e.g. "43% (57% used)"
-function bothCell(x, mode) {
-    return `${pctOf(x, mode)} (${x[OTHER[mode]]}% ${OTHER[mode]})`;
-}
-
-function forecastLines(md, items) {
-    const lines = items.filter(x => x.forecast).map(x => `- **${esc(x.name)}**: ${esc(x.forecast)}`);
-    if (lines.length) md.appendMarkdown(lines.join('\n') + '\n\n');
-}
-
-function limitTable(md, title, windows, note, mode, first) {
-    md.appendMarkdown(`${first ? '' : '---\n\n'}### ${title}\n\n`);
-    if (note) md.appendMarkdown(`${esc(note)}\n\n`);
-    md.appendMarkdown(`| Window | | ${heading(mode)} | Resets |\n|:--|:--|--:|--:|\n`);
-    for (const w of windows) {
-        md.appendMarkdown(`| **${esc(w.name)}** | ${textBar(w[mode])} | ${bothCell(w, mode)} | ${esc(resetText(w, w.left >= 100 && !w.estimated))} |\n`);
-    }
-    md.appendMarkdown('\n');
-    forecastLines(md, windows);
-}
-
-// 5-hour / weekly per model group, as on the dashboard; pools when agy reports no limits.
-function agSection(md, a, mode) {
-    md.appendMarkdown(`### Antigravity\n\n${esc(a.display)} · **${esc(a.planName)}**\n\n`);
-    const pools = a.pools.map(p => ({ ...p, name: friendlyGroup(p.name) }));
-    if (a.limits && a.limits.length) {
-        md.appendMarkdown(`| Model | Window | | ${heading(mode)} | Resets |\n|:--|:--|:--|--:|--:|\n`);
-        for (const g of a.limits) {
-            g.windows.forEach((w, i) => md.appendMarkdown(`| ${i === 0 ? `**${esc(g.short)}**` : ''} | ${esc(w.name)} | ${textBar(w[mode])} | ${bothCell(w, mode)} | ${esc(resetText(w, w.left >= 100 && !w.estimated))} |\n`));
-        }
-    } else {
-        md.appendMarkdown(`| Model | | ${heading(mode)} | Resets |\n|:--|:--|--:|--:|\n`);
-        for (const p of pools) {
-            md.appendMarkdown(`| **${esc(p.name)}** | ${textBar(p[mode])} | ${bothCell(p, mode)} | ${esc(resetText(p, p.pct >= 100))} |\n`);
-        }
-    }
-    md.appendMarkdown('\n');
-    forecastLines(md, pools);
-}
-
-// Context pct is "used"; derive both so it follows Percent Mode like quotas.
-function ctxPct(c) {
-    const used = Math.round(c.pct * 10) / 10;
-    return { used, left: Math.round((100 - used) * 10) / 10 };
-}
-
-function contextRows(md, c, mode) {
-    const src = SOURCE[c.source] || { label: c.source };
-    const n = ctxPct(c);
-    const o = OTHER[mode];
-    md.appendMarkdown(`**Context window** - ${esc(c.model)} (${src.label})\n\n`);
-    md.appendMarkdown('| | |\n|:--|--:|\n');
-    md.appendMarkdown(`| ${textBar(n[mode], 16)} | **${n[mode].toFixed(1)}%** ${mode} (${n[o].toFixed(1)}% ${o}) |\n`);
-    md.appendMarkdown(`| Used | ${formatTokens(c.usedTokens)} |\n`);
-    if (c.inputTokens) md.appendMarkdown(`| Input | ${formatTokens(c.inputTokens)} |\n`);
-    if (c.cacheReadTokens) md.appendMarkdown(`| From cache | ${formatTokens(c.cacheReadTokens)} |\n`);
-    if (c.thinkingTokens) md.appendMarkdown(`| Thinking | ${formatTokens(c.thinkingTokens)} |\n`);
-    if (c.outputTokens) md.appendMarkdown(`| Output | ${formatTokens(c.outputTokens)} |\n`);
-    md.appendMarkdown(`| Left${c.windowExact ? '' : ' (est.)'} | ${esc(c.left)} |\n\n`);
-    if (c.pct >= 80) {
-        md.appendMarkdown(c.source === 'codex'
-            ? '*Nearly full: start a new session or run `/compact`.*\n\n'
-            : '*Nearly full: `/compact` to keep going, `/clear` for a new task.*\n\n');
-    }
-}
-
 class StatusBar {
     constructor() {
-        this.quota = vscode.window.createStatusBarItem('quotaNexus.quota', vscode.StatusBarAlignment.Right, 95);
-        this.quota.name = 'Quota Nexus';
-        this.quota.command = FOCUS_CMD;
-        this.ctx = vscode.window.createStatusBarItem('quotaNexus.context', vscode.StatusBarAlignment.Right, 94);
-        this.ctx.name = 'Quota Nexus Context Window';
-        this.ctx.command = FOCUS_CMD;
+        this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
+        this.item.name = 'Nexus AI Usage';
+        this.item.command = FOCUS;
     }
-
-    update(v, opt) {
-        this.updateQuota(v, opt);
-        this.updateContext(v, opt);
-    }
-
-    updateQuota(v, opt) {
-        const item = this.quota;
-        if (!opt.show) return item.hide();
-        const mode = v.percentMode === 'left' ? 'left' : 'used';
-        const parts = [];
-        if (opt.showAgUsage !== false && v.active && v.active.pools.length) parts.push(poolsText(agItems(v.active), opt.format, mode));
-        if (opt.showClaudeUsage && v.claude.windows.length) parts.push(limitText('CC', v.claude.windows, opt.format, mode));
-        if (opt.showCodexUsage && v.codex.windows.length && !v.codex.idle) parts.push(limitText('CX', v.codex.windows, opt.format, mode));
-        const prefix = opt.showEmail && v.active ? `${stripIcons(v.active.display)} | ` : '';
-        const icon = v.connecting && !parts.length ? '$(sync~spin)' : '$(dashboard)';
-        item.text = parts.length ? `${icon} ${prefix}${stripIcons(parts.join(' | '))}` : `${icon} Quota Nexus`;
-
-        const low = Math.min(...opt.thresholds, 100);
-        const warn = Math.max(...opt.thresholds, 0);
-        item.backgroundColor = v.minPct === null ? undefined
-            : v.minPct <= low ? new vscode.ThemeColor('statusBarItem.errorBackground')
-                : v.minPct <= warn ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
-
-        const md = tooltip();
-        if (v.active) agSection(md, v.active, mode);
-        // Tools with data first; anything missing or idle goes in the notes at the bottom.
-        let first = !v.active;
-        const section = (title, wins, note) => {
-            limitTable(md, title, wins, note, mode, first);
-            first = false;
+    update(view, options = {}) {
+        const visibleProviders = view.providers
+            .filter((p) => !options.hidden?.includes(p.id))
+            .map((p) => selectStatusProvider(p, options.antigravityWindows))
+            .filter((p) => p.id !== 'antigravity' || p.groups.length);
+        this.item.text =
+            '$(dashboard) ' +
+            visibleProviders.map((p) => summary(p, view.percentMode)).join(' | ') +
+            (visibleProviders.length ? ` · ${view.percentMode === 'left' ? 'left' : 'used'}` : 'All providers hidden');
+        this.item.tooltip = hover(view);
+        this.item.accessibilityInformation = {
+            label: this.item.text.replace('$(dashboard)', '')
         };
-        if (v.claude.windows.length) section('Claude Code limits', v.claude.windows, v.claude.usageError ? `${v.claude.usageError} · as of ${v.claude.usageAgo}` : '');
-        if (v.codex.windows.length && !v.codex.idle) {
-            section('Codex limits', v.codex.windows, [v.codex.plan && `Plan: ${v.codex.plan}`, v.codex.credits, `as of ${v.codex.asOfAgo}`].filter(Boolean).join(' · '));
-        }
-        const missing = [];
-        if (!v.active && v.antigravityEnabled !== false) missing.push(v.connecting ? '*Looking for Antigravity...*' : '*Antigravity not detected - start `agy` or the Antigravity IDE.*');
-        if (v.claude.usageError && !v.claude.windows.length) missing.push(`*Claude Code limits: ${esc(v.claude.usageError)}*`);
-        if (v.codex.idle) missing.push(`*Codex not used for ${esc(v.codex.lastUsedAgo.replace(/ ago$/, ''))} - hidden until it runs again.*`);
-        if (first && !missing.length) md.appendMarkdown('### Quota Nexus\n\nNo quota data yet.\n\n');
-        if (missing.length) md.appendMarkdown(`${first ? '' : '---\n\n'}${missing.join('\n\n')}\n\n`);
-        md.appendMarkdown(`*Percentages show what is ${mode} (${MARK[mode]}). Updated ${esc(v.updatedAgo)}.* · [Show ${OTHER[mode]} instead](${MODE_LINK}) · ${FOOTER}`);
-        item.tooltip = md;
-        item.show();
+        this.item.backgroundColor = visibleProviders.some((p) => p.id === 'codex' ? !!p.error : !!marker(p))
+            ? new vscode.ThemeColor('statusBarItem.warningBackground')
+            : undefined;
+        if (options.show === false || !visibleProviders.length) this.item.hide();
+        else this.item.show();
     }
-
-    updateContext(v, opt) {
-        const item = this.ctx;
-        const all = {
-            antigravity: opt.showAgContext ? v.agContext : null,
-            claudeCode: opt.showCcContext ? v.claude.context : null,
-            codex: opt.showCxContext && !v.codex.idle ? v.codex.context : null
-        };
-        const display = opt.contextDisplay;
-        const mode = v.percentMode === 'left' ? 'left' : 'used';
-        const byRecency = Object.values(all).filter(Boolean).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        let shown;
-        if (display === 'off') shown = [];
-        else if (display === 'all') shown = byRecency;
-        else if (display === 'auto') {
-            const recent = byRecency.filter(c => Date.now() - (c.timestamp || 0) <= AUTO_RECENT_MS);
-            shown = recent.length ? recent : byRecency.slice(0, 1);
-        }
-        else shown = all[display] ? [all[display]] : [];
-        if (!shown.length) return item.hide();
-
-        const tag = c => (SOURCE[c.source] || { tag: '?' }).tag;
-        const pct = c => `${Math.round(ctxPct(c)[mode])}%${MARK[mode]}`;
-        item.text = shown.length > 1
-            ? `$(layers) ${shown.map(c => `${tag(c)} ${pct(c)}`).join(' · ')}`
-            : opt.format === 'minimal' ? `$(layers) ${pct(shown[0])}` : `$(layers) ${tag(shown[0])} ${pct(shown[0])}`;
-
-        const peak = Math.max(...shown.map(c => c.pct));
-        item.backgroundColor = peak >= 95 ? new vscode.ThemeColor('statusBarItem.errorBackground')
-            : peak >= 80 ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
-
-        const md = tooltip();
-        for (const c of display === 'auto' ? byRecency : shown) contextRows(md, c, mode);
-        md.appendMarkdown(`*Sizes marked est. are estimates.* · ${FOOTER}`);
-        item.tooltip = md;
-        item.show();
-    }
-
     dispose() {
-        this.quota.dispose();
-        this.ctx.dispose();
+        this.item.dispose();
     }
 }
-
-module.exports = { StatusBar };
+module.exports = { StatusBar, summary, hover, amount, pct, reset, progress, AG_STATUS_WINDOWS, STATUS_SPACE_NOTE };

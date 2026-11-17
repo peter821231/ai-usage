@@ -1,10 +1,13 @@
-.git/**
-.gitignore
-.github/**
-.vscode/**
-node_modules/**
-test/**
-images/**
-**/*.vsix
-**/*.map
-**/*.log
+# Package only the reviewed runtime and notices; local additions stay excluded.
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!SECURITY.md
+!THIRD-PARTY-NOTICES.md
+!assets/icon.png
+!assets/icon.svg
+!media/main.js
+!media/main.css
+!src/*.js

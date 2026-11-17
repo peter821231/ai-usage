@@ -1,155 +1,251 @@
 'use strict';
-
 const test = require('node:test');
-const assert = require('node:assert');
-const Module = require('module');
-
-function loadStatusBar() {
+const assert = require('node:assert/strict');
+const Module = require('node:module');
+const { buildUsageState } = require('../src/usageState');
+const { parseUsage } = require('../src/claudeUsage');
+const { personalUsage, extraUsage } = require('./fixtures/personal-claude.cjs');
+function load() {
     const items = [];
     const vscode = {
         StatusBarAlignment: { Right: 2 },
-        ThemeColor: class { constructor(id) { this.id = id; } },
-        MarkdownString: class { constructor() { this.value = ''; } appendMarkdown(s) { this.value += s; return this; } },
+        ThemeColor: class {},
+        MarkdownString: class {
+            constructor() {
+                this.value = '';
+            }
+            appendMarkdown(s) {
+                this.value += s;
+            }
+        },
         window: {
             createStatusBarItem: () => {
-                const it = { text: '', tooltip: null, visible: false, show() { this.visible = true; }, hide() { this.visible = false; }, dispose() {} };
-                items.push(it);
-                return it;
+                const v = {
+                    show() {
+                        this.visible = true;
+                    },
+                    hide() {
+                        this.visible = false;
+                    },
+                    dispose() {}
+                };
+                items.push(v);
+                return v;
             }
         }
     };
     const orig = Module._load;
-    Module._load = function (req, ...rest) { return req === 'vscode' ? vscode : orig.call(this, req, ...rest); };
+    Module._load = function (key, ...rest) {
+        return key === 'vscode' ? vscode : orig.call(this, key, ...rest);
+    };
     try {
         delete require.cache[require.resolve('../src/statusBar')];
-        const { StatusBar } = require('../src/statusBar');
-        return { bar: new StatusBar(), items };
+        return { ...require('../src/statusBar'), items };
     } finally {
         Module._load = orig;
     }
 }
-
-const win = (name, used, extra) => Object.assign({ id: name, name, pct: used, left: 100 - used, used, estimated: false, countdown: '1h 0m', wall: '3:00 PM', forecast: '' }, extra);
-
-function view(codexIdle, percentMode) {
-    return {
-        percentMode,
-        active: { display: 'a****@x.com', planName: 'Pro', pools: [
-            { id: 'gemini', name: 'Gemini', short: 'Gem', pct: 100, left: 100, used: 0, countdown: '', wall: '', forecast: '' },
-            { id: 'claude-gpt-oss', name: 'Claude / GPT-OSS', short: 'Cl/GPT', pct: 22, left: 22, used: 78, countdown: '1d 23h', wall: 'Fri 3:58 PM', forecast: '' }
-        ] },
-        claude: { windows: [win('5-hour', 30), win('Weekly', 50)], context: null },
-        codex: { windows: [win('30-day', 0, { estimated: true, countdown: '', wall: '' })], context: { source: 'codex', pct: 30, model: 'gpt', usedTokens: 1, inputTokens: 1, cacheReadTokens: 1, left: '1 / 2', timestamp: 2 }, idle: codexIdle, lastUsedAgo: '37d ago', plan: 'go', credits: null, asOfAgo: '37d ago' },
-        agContext: null,
-        updatedAgo: 'just now',
-        minPct: 22
-    };
+const now = Date.parse('2026-11-16T02:00:00Z');
+function view() {
+    const money = (n) => ({ amount_minor: n, exponent: 2, currency: 'USD' });
+    return buildUsageState(
+        {
+            antigravity: {
+                observedAt: now,
+                data: {
+                    groups: [
+                        {
+                            id: 'gemini',
+                            name: 'Gemini Models',
+                            windows: [{ id: '5', name: '5-hour', remainingPct: 90 }]
+                        },
+                        {
+                            id: 'argon',
+                            name: 'Gemini 4 Argon',
+                            windows: [{ id: 'wk', name: 'Weekly', remainingPct: 90 }]
+                        }
+                    ]
+                }
+            },
+            claude: {
+                data: parseUsage(
+                    {
+                        rate_limits: { spend: { used: money(3514), limit: money(20000) } }
+                    },
+                    now
+                )
+            },
+            codex: {
+                data: {
+                    limits: {
+                        at: now,
+                        windows: [
+                            { name: '5-hour', pct: 0 },
+                            { name: 'Weekly', pct: 20 }
+                        ]
+                    }
+                }
+            }
+        },
+        now
+    );
 }
-
-const OPT = { show: true, showEmail: false, thresholds: [20, 5], showClaudeUsage: true, showCodexUsage: true, showAgContext: true, showCcContext: true, showCxContext: true, contextDisplay: 'auto' };
-
-test('left mode shows percent LEFT for every tool', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update(view(false, 'left'), { ...OPT, format: 'descriptive' });
-    assert.strictEqual(items[0].text, '$(dashboard) Antigravity: Gemini 100% · Claude 22% left | Claude Code: 70% · wk 50% left | Codex: ~100% left');
-    assert.match(items[0].tooltip.value, /\| Window \| \| Left \| Resets \|/);
-    assert.match(items[0].tooltip.value, /\| 70% \(30% used\) \|/);
-    assert.match(items[0].tooltip.value, /\| 22% \(78% used\) \|/);
-    assert.match(items[0].tooltip.value, /Percentages show what is left \(↓\)/);
-    assert.match(items[0].tooltip.value, /\[Show used instead\]\(command:quotaNexus\.togglePercentMode\)/);
-    bar.update(view(false, 'left'), { ...OPT, format: 'compact' });
-    assert.strictEqual(items[0].text, '$(dashboard) AG: Gemini 100%↓ · Claude 22%↓ | CC: 70%↓ · wk 50%↓ | CX: ~100%↓');
+test('status bar keeps Argon and window names distinct and money separate from context', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    bar.update(v);
+    assert.match(items[0].text, /Gemini 5h 10%/);
+    assert.match(items[0].text, /wk Unknown/);
+    assert.match(items[0].text, /Argon wk 10%/);
+    assert.doesNotMatch(items[0].text, /Claude\/GPT/);
+    assert.match(items[0].text, /Claude USD 35.14 \/ 200.00/);
+    assert.match(items[0].text, /Codex 5h 0% · wk 20%/);
+    assert.match(items[0].tooltip.value, /164\\?.86/);
+    assert.match(items[0].tooltip.value, /Gemini 4 Argon/);
+    assert.match(items[0].tooltip.value, /Claude and GPT models/);
+    assert.match(items[0].tooltip.value, /Status bar space is limited/);
+    assert.equal(items.length, 1);
+    assert.doesNotMatch(items[0].text, /Context/);
+    assert.match(items[0].tooltip.value, /\| Usage \|/);
+    assert.match(items[0].tooltip.value, /`[█░]+`/);
 });
 
-test('used is the default and flips every number, column and arrow', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update(view(false), { ...OPT, format: 'descriptive' });
-    assert.strictEqual(items[0].text, '$(dashboard) Antigravity: Gemini 0% · Claude 78% used | Claude Code: 30% · wk 50% used | Codex: ~0% used');
-    assert.match(items[0].tooltip.value, /\| Model \| \| Used \| Resets \|/);
-    assert.match(items[0].tooltip.value, /\| 30% \(70% left\) \|/);
-    assert.match(items[0].tooltip.value, /\[Show left instead\]/);
-    bar.update(view(false, 'used'), { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[0].text, '$(dashboard) Gemini 0%↑ | Claude 78%↑ | CC 30%↑ · wk 50%↑ | CX ~0%↑');
-    assert.strictEqual(items[0].backgroundColor, undefined, 'colour still follows what is left');
+test('Antigravity selections change only the summary; all windows remain in hover and the original view', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    const before = structuredClone(v);
+    const choices = { geminiFiveHour: false, geminiWeekly: false, argonWeekly: false, claudeGptFiveHour: true, claudeGptWeekly: true };
+    bar.update(v, { antigravityWindows: choices });
+    assert.match(items[0].text, /AG Claude\/GPT 5h Unknown · wk Unknown/);
+    assert.doesNotMatch(items[0].text, /Gemini|Argon/);
+    assert.match(items[0].tooltip.value, /Gemini Models/);
+    assert.match(items[0].tooltip.value, /Gemini 4 Argon/);
+    assert.deepEqual(v, before);
+    bar.update(v, { antigravityWindows: { ...choices, claudeGptFiveHour: false, claudeGptWeekly: false } });
+    assert.doesNotMatch(items[0].text, /\bAG\b/);
+    assert.match(items[0].text, /Claude USD/);
+    bar.update(v, { hidden: ['claude', 'codex'], antigravityWindows: { geminiFiveHour: false, geminiWeekly: false, argonWeekly: false } });
+    assert.equal(items[0].visible, false);
 });
 
-test('Antigravity 5-hour / weekly limits: tightest per group in the bar, every window in the hover', () => {
-    const { bar, items } = loadStatusBar();
-    const v = view(false, 'used');
-    v.active.limits = [
-        { short: 'Gemini', windows: [win('5-hour', 14), win('Weekly', 3)] },
-        { short: 'Claude', windows: [win('5-hour', 7), win('Weekly', 82)] }
-    ];
-    bar.update(v, { ...OPT, format: 'compact' });
-    assert.match(items[0].text, /AG: Gemini 14%↑ · Claude 82%↑ \|/);
-    const md = items[0].tooltip.value;
-    assert.match(md, /\| Model \| Window \| \| Used \| Resets \|/);
-    assert.match(md, /\| \*\*Claude\*\* \| 5\\?-hour \| .* \| 7% \(93% left\) \|/);
-    assert.match(md, /\|  \| Weekly \| .* \| 82% \(18% left\) \|/);
+test('unselected Antigravity windows do not color the selected summary', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    v.providers = [v.providers[0]];
+    v.providers[0].groups[0].rows[1].usedPct = 4;
+    const hiddenPool = v.providers[0].groups.find((g) => g.short === 'Claude/GPT');
+    hiddenPool.rows[0].usedPct = 99;
+    hiddenPool.rows[0].stale = true;
+    bar.update(v);
+    assert.equal(items[0].backgroundColor, undefined);
+    bar.update(v, { antigravityWindows: { claudeGptFiveHour: true } });
+    assert.ok(items[0].backgroundColor);
 });
 
-test('context window follows percent mode too', () => {
-    const { bar, items } = loadStatusBar();
-    const v = view(false, 'left');
-    v.claude.context = { source: 'claudeCode', pct: 13.1, model: 'opus', usedTokens: 131300, inputTokens: 2, cacheReadTokens: 130900, left: '868.7K / 1M', timestamp: 9 };
-    bar.update(v, { ...OPT, format: 'compact' });
-    assert.strictEqual(items[1].text, '$(layers) CC 87%↓');
-    assert.match(items[1].tooltip.value, /\*\*86\.9%\*\* left \(13\.1% used\)/);
-    assert.match(items[1].tooltip.value, /\| Used \| 131\.3K \|/);
-    assert.match(items[1].tooltip.value, /\| From cache \| 130\.9K \|/);
-    assert.doesNotMatch(items[1].tooltip.value, /Input tokens/);
-    bar.update({ ...v, percentMode: 'used' }, { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[1].text, '$(layers) 13%↑');
+test('old Codex records keep real values and timestamps without a yellow idle warning; read errors still warn', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const at = now - 29*60000;
+    const input = { codex: { data: { limits: { at, windows: [
+        { name: '5-hour', pct: 5, resetsAt: new Date(now+3600000).toISOString() },
+        { name: 'Weekly', pct: 24 }
+    ] } } } };
+    const state = () => {
+        const v = buildUsageState(input, now);
+        v.providers = v.providers.filter((p) => p.id === 'codex');
+        return v;
+    };
+    bar.update(state());
+    assert.match(items[0].text, /Codex 5h 5% · wk 24%/);
+    assert.doesNotMatch(items[0].text, /[~!]/);
+    assert.equal(items[0].backgroundColor, undefined);
+    assert.match(items[0].tooltip.value, /Last recorded/);
+    assert.equal(state().providers[0].groups[0].rows[0].observedAt, at);
+    input.codex.data.limits.windows[0].resetsAt = new Date(now-1000).toISOString();
+    const expired = state().providers[0].groups[0].rows[0];
+    assert.equal(expired.resetPending, true);
+    assert.equal(expired.usedPct, 5);
+    bar.update(state());
+    assert.equal(items[0].backgroundColor, undefined);
+    input.codex.error = 'Could not read local Codex rate-limit events';
+    bar.update(state());
+    assert.ok(items[0].backgroundColor);
+    assert.match(items[0].text, /!/);
+    assert.match(items[0].tooltip.value, /Error/);
 });
 
-test('tools with data come first, missing ones are notes at the bottom', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update({ ...view(true), active: null }, { ...OPT, format: 'minimal' });
-    const md = items[0].tooltip.value;
-    assert.ok(md.startsWith('### Claude Code limits'), md.slice(0, 40));
-    const cc = md.indexOf('Claude Code limits');
-    assert.ok(md.indexOf('Antigravity not detected') > cc);
-    assert.ok(md.indexOf('Codex not used for 37d') > md.indexOf('Antigravity not detected'));
+test('hover usage charts distinguish unknown from real zero and keep spend independent', () => {
+    const { progress, hover } = load();
+    assert.equal(progress(null), 'Unknown');
+    assert.equal(progress(undefined), 'Unknown');
+    assert.equal(progress(0), '`░░░░░░░░░░░░`');
+    assert.equal(progress(25), '`███░░░░░░░░░`');
+    const v = view();
+    v.providers[1].context = { pct: 68 };
+    const text = hover(v).value;
+    assert.match(text, /17\.6% budget used/);
+    assert.doesNotMatch(text, /68% budget/);
+});
+test('unknown, stale, errors and used/remaining semantics are explicit', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    v.percentMode = 'left';
+    v.providers[2].error = 'failed';
+    v.providers[2].groups[0].rows[0].stale = true;
+    bar.update(v);
+    assert.match(items[0].text, /Codex 5h 100% · wk 80% !/);
+    assert.match(items[0].text, /left$/);
+    assert.match(items[0].tooltip.value, /stale/);
+    assert.match(items[0].tooltip.value, /Error/);
+    bar.update(buildUsageState({}, now));
+    assert.match(items[0].text, /Unknown/);
+    assert.doesNotMatch(items[0].text, /0%/);
 });
 
-test('idle Codex stays off the status bar and the context item', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update(view(true, 'left'), { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[0].text, '$(dashboard) Gemini 100%↓ | Claude 22%↓ | CC 70%↓ · wk 50%↓');
-    assert.match(items[0].tooltip.value, /Codex not used for 37d/);
-    assert.strictEqual(items[1].visible, false, 'no Codex context item when idle');
+test('hidden sources do not color visible healthy usage, and all-hidden bars disappear', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    v.providers[0].error = 'hidden-source-failure';
+    bar.update(v, { hidden: ['antigravity'] });
+    assert.doesNotMatch(items[0].text, /AG|hidden-source-failure/);
+    assert.equal(items[0].backgroundColor, undefined);
+    assert.equal(items[0].visible, true);
+    bar.update(v, { hidden: ['antigravity', 'claude', 'codex'] });
+    assert.equal(items[0].visible, false);
+    assert.equal(items[0].backgroundColor, undefined);
+    bar.update(v, { hidden: ['antigravity'] });
+    assert.equal(items[0].visible, true);
 });
 
-test('auto shows every session active in the last 15 minutes, tagged', () => {
-    const { bar, items } = loadStatusBar();
-    const now = Date.now();
-    const ctx = (source, pct, ago) => ({ source, pct, model: 'm', usedTokens: 1, cacheReadTokens: 0, left: '1 / 2', timestamp: now - ago });
-    const v = view(false, 'used');
-    v.claude.context = ctx('claudeCode', 18, 60e3);
-    v.agContext = ctx('antigravity', 3, 10e3);
-    v.codex.context = ctx('codex', 50, 3600e3);
-    bar.update(v, { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[1].text, '$(layers) AG 3%↑ · CC 18%↑', 'newest first, old Codex left out');
-    v.agContext = ctx('antigravity', 3, 20 * 60e3);
-    bar.update(v, { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[1].text, '$(layers) 18%↑', 'one active session stays short');
-});
-
-test('while Antigravity is still being found, say so instead of "not detected"', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update({ ...view(false), active: null, connecting: true }, { ...OPT, format: 'minimal' });
-    assert.match(items[0].tooltip.value, /Looking for Antigravity/);
-    assert.doesNotMatch(items[0].tooltip.value, /not detected/);
-    assert.match(items[0].text, /^\$\(dashboard\) CC /, 'Claude shows without waiting');
-    bar.update({ ...view(false), active: null, connecting: true, claude: { windows: [], context: null }, codex: { windows: [], context: null, idle: false } }, { ...OPT, format: 'minimal' });
-    assert.strictEqual(items[0].text, '$(sync~spin) Quota Nexus');
-});
-
-test('Antigravity can be hidden from the status bar or turned off', () => {
-    const { bar, items } = loadStatusBar();
-    bar.update(view(false), { ...OPT, format: 'minimal', showAgUsage: false });
-    assert.strictEqual(items[0].text, '$(dashboard) CC 30%↑ · wk 50%↑ | CX ~0%↑');
-    assert.match(items[0].tooltip.value, /### Antigravity\n/, 'still in the hover');
-    bar.update({ ...view(false), active: null, antigravityEnabled: false }, { ...OPT, format: 'minimal' });
-    assert.doesNotMatch(items[0].tooltip.value, /Antigravity/, 'turned off: no "not detected" note');
+test('Pro and Max status summaries keep subscription windows visible with optional extra spending', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    for (const plan of ['pro', 'max']) {
+        for (const extra of [undefined, extraUsage, { used_credits: 321, monthly_limit: 5000 }]) {
+            const v = buildUsageState(
+                {
+                    claude: {
+                        data: parseUsage(personalUsage(plan, 'legacy', extra), now)
+                    }
+                },
+                now
+            );
+            v.providers = v.providers.filter((p) => p.id === 'claude');
+            bar.update(v);
+            assert.match(items[0].text, /Claude 5h 0% · wk 42%/);
+            assert.match(items[0].text, /Weekly · Opus 18%/);
+            assert.doesNotMatch(items[0].text, /Claude USD|200\.00|monthly rule/);
+            assert.match(items[0].tooltip.value, /Weekly · Sonnet/);
+            assert.doesNotMatch(items[0].tooltip.value, /official monthly rule/);
+            if (extra) assert.match(items[0].tooltip.value, /Extra usage budget/);
+            v.percentMode = 'left';
+            bar.update(v);
+            assert.match(items[0].text, /Claude 5h 100% · wk 58%/);
+        }
+    }
 });

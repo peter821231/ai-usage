@@ -3,7 +3,7 @@
 const vscode = require('vscode');
 const crypto = require('crypto');
 
-const ALLOWED = new Set(['ready', 'refresh', 'switch', 'signIn', 'rename', 'remove', 'toggleMask', 'openSettings', 'diagnostics', 'snooze', 'enableClaudeLimits', 'setSetting', 'moveAccount']);
+const ALLOWED = new Set(['ready', 'refresh', 'openSettings', 'diagnostics', 'setSetting']);
 
 class DashboardProvider {
     constructor(extensionUri, onMessage) {
@@ -33,13 +33,16 @@ class DashboardProvider {
         view.onDidChangeVisibility(() => {
             if (view.visible) this.post();
         });
-        view.onDidDispose(() => { this.view = null; this.ready = false; });
+        view.onDidDispose(() => {
+            this.view = null;
+            this.ready = false;
+        });
     }
 
     // Gear: toggles settings when the dashboard is showing, else opens it on settings.
     showSettings() {
         this.pendingSettings = this.view && this.view.visible ? 'toggle' : 'open';
-        return vscode.commands.executeCommand('quotaNexus.dashboard.focus').then(() => this.flushSettings());
+        return vscode.commands.executeCommand('nexusAiUsage.dashboard.focus').then(() => this.flushSettings());
     }
 
     flushSettings() {
@@ -77,7 +80,7 @@ class DashboardProvider {
 <meta http-equiv="Content-Security-Policy" content="${csp}">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="stylesheet" href="${css}">
-<title>Quota Nexus</title>
+<title>Nexus AI Usage</title>
 </head>
 <body>
 <div id="root" aria-live="polite"></div>

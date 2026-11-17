@@ -1,403 +1,416 @@
-// @ts-check
-(function () {
-    // eslint-disable-next-line no-undef
-    const vscode = acquireVsCodeApi();
+'use strict';
+(() => {
+    const api = acquireVsCodeApi();
     const root = document.getElementById('root');
-    const saved = vscode.getState() || {};
-    const expanded = new Set(saved.expanded || ['active', 'claude', 'codex']);
-    let state = null;
-    let settingsOpen = !!saved.settingsOpen;
-    // While settings are open, skip redraws that change nothing there, so an open dropdown stays open.
-    let shownSig = '';
-
-    // Constant SVG markup only (codicon-style, 16px); user data always goes through textContent.
-    const svg = d => `<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="${d}"/></svg>`;
-    const ICON = {
-        chevron: svg('M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'),
-        up: svg('M8 3.3l4.85 4.85-.7.7L8.5 5.2V13h-1V5.2L3.85 8.85l-.7-.7L8 3.3z'),
-        down: svg('M8 12.7L3.15 7.85l.7-.7 3.65 3.65V3h1v7.8l3.65-3.65.7.7L8 12.7z'),
-        tag: svg('M2 2h5.6L14 8.4 8.4 14 2 7.6V2zm1 1v4.2l5.4 5.4 4.2-4.2L7.2 3H3zm2 1.25a.75.75 0 1 1 0 1.5.75.75 0 0 1 0-1.5z'),
-        trash: svg('M6 1.5h4v1h3.5v1h-1v10a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-10h-1v-1H6v-1zm-1.5 2v10h7v-10h-7zm2 2h1v6h-1v-6zm2 0h1v6h-1v-6z'),
-        plus: svg('M7.5 2h1v5.5H14v1H8.5V14h-1V8.5H2v-1h5.5V2z'),
-        warn: svg('M8 1.5l7 12.5H1L8 1.5zm0 2.05L2.7 13h10.6L8 3.55zM7.5 6h1v4h-1V6zm0 5h1v1h-1v-1z')
+    let state;
+    let showSettings = false;
+    const stored = api.getState?.();
+    const collapsed = new Set(
+        (Array.isArray(stored?.collapsed) ? stored.collapsed : []).filter((id) =>
+            ['antigravity', 'claude', 'codex'].includes(id)
+        )
+    );
+    const expandedDetails = new Set();
+    const el = (tag, cls, text) => {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
     };
-
-    function h(tag, attrs, ...kids) {
-        const el = document.createElement(tag);
-        for (const [k, v] of Object.entries(attrs || {})) {
-            if (v === null || v === undefined || v === false) continue;
-            if (k === 'class') el.className = String(v);
-            else if (k === 'html') el.innerHTML = String(v);
-            else el.setAttribute(k, v === true ? '' : String(v));
-        }
-        for (const c of kids.flat(Infinity)) {
-            if (c === null || c === undefined || c === false || c === '') continue;
-            el.append(c instanceof Node ? c : document.createTextNode(String(c)));
-        }
-        return el;
+    const percent = (v) => (typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v * 10) / 10}%` : 'Unknown');
+    const money = (v, c) => (typeof v === 'number' && Number.isFinite(v) ? `${c || '?'} ${v.toFixed(2)}` : 'Unknown');
+    const stamp = (value) =>
+        value
+            ? new Date(value).toLocaleString('en-GB', {
+                  timeZone: state.timeZone || 'Asia/Taipei',
+                  dateStyle: 'medium',
+                  timeStyle: 'short'
+              })
+            : 'Unknown';
+    function countdown(row) {
+        if (!row.resetAt) return 'Unknown';
+        if (row.resetPending) return 'Pending';
+        const minutes = Math.max(1, Math.ceil((Date.parse(row.resetAt) - state.now) / 60000));
+        const days = Math.floor(minutes / 1440),
+            hours = Math.floor((minutes % 1440) / 60),
+            mins = minutes % 60;
+        return days ? `${days}d ${hours}h` : hours ? `${hours}h ${mins}m` : `${mins}m`;
     }
-
-    function icon(name) {
-        return h('span', { class: 'ico', html: ICON[name] });
+    function resetText(row) {
+        if (!row.resetAt) return 'Unknown';
+        return `${stamp(row.resetAt)} · ${row.resetPending ? 'elapsed; awaiting new reading' : 'in ' + countdown(row)}${row.resetBasis === 'event-relative' ? ' · from event + interval' : ''}${row.resetBasis === 'official-monthly-rule' ? ' · official monthly rule (00:00 UTC)' : ''}`;
     }
-
-    function level(pctLeft) {
-        return pctLeft <= 10 ? 'low' : pctLeft <= 30 ? 'warn' : 'ok';
+    function tokens(value) {
+        if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unknown';
+        if (value >= 1e6) return `${(value / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+        if (value >= 1e3) return `${(value / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
+        return String(value);
     }
-
-    function mode() {
-        return state && state.percentMode === 'left' ? 'left' : 'used';
+    function creditCount(value) {
+        return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-US') : 'Unknown';
     }
-
-    function pctText(x) {
-        const m = mode();
-        return `${x.estimated ? '~' : ''}${x[m]}% ${m}`;
+    function sourceTime(p) {
+        return (
+            p.spend?.observedAt ||
+            p.observedAt ||
+            p.groups.flatMap((g) => g.rows).find((r) => r.observedAt)?.observedAt ||
+            null
+        );
     }
-
-    function resetsText(x) {
-        return x.countdown === 'now' ? `Resets now (${x.wall})` : `Resets in ${x.countdown} (${x.wall})`;
+    function age(value) {
+        if (!value) return 'No reading';
+        const minutes = Math.max(0, Math.floor((state.now - value) / 60000));
+        return minutes < 1
+            ? 'just now'
+            : minutes < 60
+              ? `${minutes}m ago`
+              : minutes < 1440
+                ? `${Math.floor(minutes / 60)}h ago`
+                : `${Math.floor(minutes / 1440)}d ago`;
     }
-
-    function fmtK(n) {
-        if (!n || n <= 0) return '0';
-        if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'M';
-        if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, '') + 'K';
-        return String(n);
+    function button(label, action) {
+        const b = el('button', 'button', label);
+        b.type = 'button';
+        if (label) b.dataset.focus = `action:${label}`;
+        b.addEventListener('click', action);
+        return b;
     }
-
-    // "Claude and GPT models" -> "Claude", "Gemini Models" -> "Gemini"; GPT only names a group without Claude.
-    function groupShort(name) {
-        const n = String(name || '').toLowerCase();
-        const parts = [['gemini', 'Gemini'], ['claude', 'Claude']].filter(([k]) => n.includes(k)).map(([, v]) => v);
-        if (!parts.length && n.includes('gpt')) parts.push('GPT');
-        return parts.length ? parts.join(' / ') : String(name || '').split(/\s+/)[0];
+    function badge(label, warning) {
+        return el('span', warning ? 'badge warning' : 'badge', label);
     }
-
-    function meter(pct, lv, pace, label) {
-        const fill = h('div', { class: `meter-fill ${lv}` });
-        fill.style.width = `${pct}%`;
-        const track = h('div', { class: 'meter', role: 'progressbar', 'aria-valuemin': 0, 'aria-valuemax': 100, 'aria-valuenow': pct, 'aria-label': label }, fill);
-        if (typeof pace === 'number' && pace >= 0 && pace <= 100) {
-            const tick = h('div', { class: 'meter-pace' });
-            tick.style.left = `${Math.min(99, Math.max(1, pace))}%`;
-            track.append(tick);
+    function meter(value, label) {
+        const track = el('div', 'meter');
+        track.setAttribute('role', 'meter');
+        track.setAttribute('aria-label', label);
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            track.setAttribute('aria-valuemin', '0');
+            track.setAttribute('aria-valuemax', '100');
+            track.setAttribute('aria-valuenow', String(Math.max(0, Math.min(100, value))));
+            const fill = el('div', value >= 90 ? 'fill high' : value >= 75 ? 'fill medium' : 'fill');
+            fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
+            track.append(fill);
+        } else {
+            track.classList.add('unknown');
+            track.setAttribute('aria-valuetext', 'Unknown');
         }
         return track;
     }
-
-    // Collapsed view: equal-width cells (name, value, thin bar) so every card reads the same way.
-    function miniGrid(items, cols) {
-        const m = mode();
-        const grid = h('div', { class: 'mini-grid' }, items.map(([label, x, unit, short], i) => {
-            const u = unit || m;
-            const pct = Math.max(0, Math.min(100, Math.round(x[u])));
-            const lv = level(x.left);
-            return h('div', { class: `mini${i === items.length - 1 && i % cols === 0 ? ' full' : ''}`, title: `${label}: ${x.estimated ? '~' : ''}${pct}% ${u}` },
-                h('div', { class: 'mini-top' },
-                    h('span', { class: 'mini-k' }, h('span', { class: 'lf' }, label), short ? h('span', { class: 'ls' }, short) : null),
-                    h('span', { class: `mini-v ${lv}` }, `${x.estimated ? '~' : ''}${pct}%`, h('span', { class: 'mini-u' }, ` ${u}`))),
-                meter(pct, lv, null, `${label} ${pct}% ${u}`));
-        }));
-        grid.style.gridTemplateColumns = `repeat(${Math.max(1, cols)}, minmax(0, 1fr))`;
-        return grid;
-    }
-
-    function agSummary(a) {
-        if (a.limits && a.limits.length) {
-            const cols = Math.max(...a.limits.map(g => g.windows.length));
-            return miniGrid(a.limits.flatMap(g => g.windows.map(w => [`${groupShort(g.name)} ${w.name}`, w, null, `${groupShort(g.name)} ${{ '5-hour': '5h', Weekly: 'wk' }[w.name] || w.name}`])), cols);
+    function quota(row) {
+        const box = el('div', 'quota');
+        const label = el('span', 'window', row.label);
+        label.title = row.label;
+        if (row.stale && !row.recordedOnly && row.usedPct !== null) {
+            const warning = el('span', 'row-stale', ' ~');
+            warning.title = 'Stale: last observation retained';
+            warning.setAttribute('aria-label', 'Stale');
+            label.append(warning);
         }
-        return miniGrid(a.pools.map(p => [groupShort(p.name), p]), Math.min(2, a.pools.length));
+        const value = state.percentMode === 'left' ? row.remainingPct : row.usedPct;
+        const valueText = el('strong', value === null ? 'value unknown-value' : 'value', percent(value));
+        const reset = el('span', 'reset', countdown(row));
+        reset.title = `Reset: ${resetText(row)}`;
+        box.title = `${row.label}: ${percent(row.usedPct)} used · ${percent(row.remainingPct)} remaining. Reset: ${resetText(row)}`;
+        box.append(
+            label,
+            meter(value, `${row.label}: ${percent(value)} ${state.percentMode === 'left' ? 'remaining' : 'used'}`),
+            valueText,
+            reset
+        );
+        return box;
     }
-
-    function limitRow(w) {
-        const m = mode();
-        const pct = Math.max(0, Math.min(100, Math.round(w[m])));
-        const lv = level(w.left);
-        // Pace tick follows the bar: time gone in "used" mode, time left in "left" mode.
-        const pace = typeof w.pacePct === 'number' ? (m === 'left' ? 100 - w.pacePct : w.pacePct) : null;
-        const paceNote = pace === null ? '' : ` · Tick: ${pace}% of the window ${m === 'left' ? 'left' : 'gone'}`;
-        const rate = w.drainRate ? ` · ↓ ${w.drainRate}%/hr` : '';
-        const tip = `${w.group ? w.group + ' · ' : ''}${w.name}: ${pctText(w)}${w.countdown ? ' · ' + resetsText(w) : ''}${paceNote}${rate}${w.forecast ? ' · ' + w.forecast : ''}`;
-        const reset = w.estimated ? 'Reset due' : (w.countdown || '-');
-        return h('div', { class: 'lim', title: tip },
-            h('span', { class: 'lim-name' }, w.short ? groupShort(w.name) : w.name),
-            meter(pct, lv, pace, `${w.name} ${pct}% ${m}`),
-            h('span', { class: `lim-pct ${lv}` }, lv === 'low' ? icon('warn') : null, `${pct}%`),
-            h('span', { class: 'lim-reset' }, reset));
+    function spend(s) {
+        const box = el('div', 'spend');
+        const line = el('div', 'line spend-heading');
+        line.append(el('h3', '', s.title || 'Account budget'));
+        if (s.stale) line.append(badge('Stale', true));
+        if (s.enabled === false) line.append(badge('Spending disabled', true));
+        box.append(line);
+        const big = el('div', 'money');
+        big.append(el('strong', '', money(s.used, s.currency)), el('span', 'cap', ` / ${money(s.limit, s.currency)}`));
+        box.append(big, meter(s.usedPct, `Budget ${percent(s.usedPct)} used`));
+        const meta = el('div', 'spend-meta');
+        meta.append(
+            el('span', 'muted', `${percent(s.usedPct)} used`),
+            el(
+                'span',
+                'remaining',
+                s.remaining !== null && s.remaining < 0
+                    ? `Over budget ${money(-s.remaining, s.currency)}`
+                    : `Remaining ${money(s.remaining, s.currency)}`
+            )
+        );
+        const reset = el('div', 'budget-reset');
+        reset.append(el('span', 'muted', 'Resets in'), el('span', '', countdown(s)));
+        reset.title = resetText(s);
+        box.append(meta, reset);
+        if (s.resetBasis === 'official-monthly-rule')
+            box.append(el('div', 'detail reset-policy', 'Monthly · 1st at 00:00 UTC · official rule'));
+        if (s.issue) box.append(el('p', 'problem', s.issue));
+        return box;
     }
-
-    function groupHead(label, withLegend) {
-        return h('div', { class: 'grp-head' },
-            h('span', { class: 'grp-name' }, label),
-            withLegend ? h('span', { class: 'grp-legend' }, `${mode() === 'left' ? 'Left' : 'Used'} · Resets in`) : null);
+    function contextView(c) {
+        const section = el('section', 'context');
+        const known = typeof c.windowTokens === 'number' && typeof c.usedTokens === 'number';
+        const heading = el('div', 'context-heading');
+        heading.append(
+            el('h3', '', 'Context'),
+            el('span', 'context-model', c.model || ''),
+            el(
+                'strong',
+                'context-value',
+                `${percent(c.pct)}${known ? ' · ' + tokens(c.usedTokens) + ' / ' + tokens(c.windowTokens) : ''}`
+            )
+        );
+        heading.title = 'Conversation context occupancy, separate from quota and budget';
+        section.append(heading, meter(c.pct, `Conversation context: ${percent(c.pct)} occupied`));
+        const meta = el('div', 'context-meta');
+        meta.append(
+            el('span', '', c.windowExact ? 'Context window' : 'Estimated context'),
+            el('span', '', known ? `${tokens(Math.max(0, c.windowTokens - c.usedTokens))} left` : 'Unknown')
+        );
+        section.append(meta);
+        return section;
     }
-
-    // 5-hour / weekly rows per model group when agy reports them, else one row per pool.
-    function antigravityLimits(a) {
-        if (a.limits && a.limits.length) {
-            return a.limits.map((g, i) => h('div', { class: 'grp' }, groupHead(g.name, i === 0), g.windows.map(limitRow)));
-        }
-        return a.pools.length ? h('div', { class: 'grp' }, groupHead('Quota pools', true), a.pools.map(limitRow)) : null;
-    }
-
-    // Tool cards already name the model in their header, so they pass showModel = false.
-    function context(c, showModel) {
-        const pctUsed = Math.min(100, Math.max(0, Math.round(c.pct)));
-        const lv = c.pct >= 95 ? 'low' : c.pct >= 80 ? 'warn' : 'ok';
-        const full = c.pct >= 80;
-        const max = c.windowTokens || 0;
-        const left = max ? fmtK(Math.max(0, max - c.usedTokens)) : String(c.left || '').split(' / ')[0];
-        const parts = [['Input', c.inputTokens], ['Cache read', c.cacheReadTokens], ['Output', c.outputTokens], ['Thinking', c.thinkingTokens]].filter(p => p[1]);
-        const hint = full ? (c.source === 'codex' ? 'Nearly full: start a new session or /compact.' : 'Nearly full: /compact to keep going, /clear for a new task.') : '';
-        const tip = [hint, parts.map(([k, n]) => `${k} ${fmtK(n)}`).join(' · ')].filter(Boolean).join('\n') || null;
-        return h('div', { class: 'ctx', title: tip },
-            h('div', { class: 'ctx-head' },
-                h('span', { class: 'ctx-title' }, 'Context', showModel ? h('span', { class: 'ctx-model' }, c.model) : null),
-                h('span', { class: `ctx-val ${lv}` }, `${pctUsed}%`, h('span', { class: 'muted' }, ` · ${fmtK(c.usedTokens)}${max ? ' / ' + fmtK(max) : ''}`))),
-            meter(pctUsed, lv, null, `Context ${pctUsed}% used`),
-            h('div', { class: 'ctx-foot' },
-                h('span', null, c.windowExact ? 'Session context' : 'Estimated context'),
-                full ? h('span', { class: 'hint warn' }, icon('warn'), '/compact') : h('span', null, `${left} left`)));
-    }
-
-    function credits(cr) {
-        const fmt = n => Number(n).toLocaleString();
-        const parts = [];
-        if (cr.prompt) parts.push(['Prompt credits', `${fmt(cr.prompt.available)}${cr.prompt.monthly ? ' / ' + fmt(cr.prompt.monthly) : ''}`]);
-        if (cr.flow) parts.push(['Flow credits', `${fmt(cr.flow.available)}${cr.flow.monthly ? ' / ' + fmt(cr.flow.monthly) : ''}`]);
-        return parts.length ? h('dl', { class: 'kv' }, parts.map(([k, v]) => [h('dt', null, k), h('dd', null, v)])) : null;
-    }
-
-    function badge(text, cls) {
-        return text ? h('span', { class: `badge ${cls || ''}` }, text) : null;
-    }
-
-    // Header: product tile, title + one muted meta line, badges, chevron.
-    function cardHead(id, tile, title, meta, badges) {
-        const open = expanded.has(id);
-        return h('button', { class: 'card-head', 'data-action': 'toggle', 'data-id': id, 'aria-expanded': String(open) },
-            h('span', { class: `tile ${tile[1]}`, 'aria-hidden': 'true' }, tile[0]),
-            h('span', { class: 'head-text' },
-                h('span', { class: 'card-title' }, title),
-                meta && meta.length ? h('span', { class: 'card-meta' }, meta.filter(Boolean).map((m, i) => [i ? h('span', { class: 'sep' }, '·') : null, m])) : null),
-            h('span', { class: 'badges' }, badges, h('span', { class: `chev${open ? ' up' : ''}`, html: ICON.chevron })));
-    }
-
-    function card(id, cls, head, summary, body) {
-        const open = expanded.has(id);
-        return h('section', { class: `card ${cls || ''}` }, head,
-            !open && summary ? h('div', { class: 'summary' }, summary) : null,
-            open ? h('div', { class: 'card-body' }, body) : null);
-    }
-
-    function statusDot(text, cls) {
-        return h('span', { class: 'status' }, h('span', { class: `dot ${cls}` }), text);
-    }
-
-    function suggestionBanner(sug) {
-        const name = sug.betterLabel || sug.betterDisplay;
-        return h('section', { class: 'banner' },
-            icon('warn'),
-            h('span', { class: 'banner-msg' }, `${sug.poolName} is at ${sug.currentPct}% left. `, h('strong', null, name), ` has ${sug.betterPct}%.`),
-            h('button', { class: 'btn primary sm', 'data-action': 'switch', 'data-email': sug.betterEmail }, 'Switch'));
-    }
-
-    function activeCard(s) {
-        const a = s.active;
-        const models = [...new Set(a.pools.flatMap(p => p.models || []))];
-        const urgent = a.pools.find(p => p.forecast && p.forecast.includes('runs out'));
-        const summary = agSummary(a);
-        const body = [
-            antigravityLimits(a) || h('div', { class: 'muted' }, 'No quota data reported.'),
-            urgent ? h('div', { class: 'note warn' }, icon('warn'), urgent.forecast) : null,
-            s.agContext ? context(s.agContext, true) : null,
-            (models.length || a.credits.prompt || a.credits.flow) ? h('div', { class: 'card-foot' },
-                credits(a.credits),
-                models.length ? h('div', { class: 'models', title: models.join(', ') }, `Models: ${models.join(', ')}`) : null) : null
-        ];
-        return card('active', 'is-active',
-            cardHead('active', ['AG', 'ag'], 'Antigravity', [statusDot('Active', 'on'), a.display, a.label], [badge(a.planName, 'plan')]),
-            summary, body);
-    }
-
-    function toolCard(id, tile, title, meta, badges, wins, ctx, foot) {
-        const items = wins.map(w => [w.name, w]);
-        if (ctx) items.push(['Context', { left: 100 - Math.round(ctx.pct), used: Math.round(ctx.pct), estimated: false }, 'used']);
-        const summary = items.length ? miniGrid(items, Math.min(2, items.length)) : null;
-        const body = [
-            wins.length ? h('div', { class: 'grp' }, groupHead('Usage limits', true), wins.map(limitRow)) : null,
-            ctx ? context(ctx, false) : null,
-            foot
-        ];
-        return card(id, '', cardHead(id, tile, title, meta, badges), summary, body);
-    }
-
-    function otherCard(a, idx, total) {
-        const id = `acc:${a.email}`;
-        const ib = (action, ic, label, extra) => h('button', Object.assign({ class: 'btn icon', 'data-action': action, 'data-email': a.email, title: label, 'aria-label': label, html: ICON[ic] }, extra || {}));
-        const summary = a.pools.length ? agSummary(a) : h('span', { class: 'muted' }, 'No snapshot yet');
-        const body = [
-            antigravityLimits(a),
-            h('div', { class: 'muted small' }, a.snapshotAgo ? `Snapshot from ${a.snapshotAgo}. Updates when this account is active.` : 'Sign in once to capture a snapshot.'),
-            h('div', { class: 'acct-actions' },
-                h('button', { class: 'btn primary sm', 'data-action': 'switch', 'data-email': a.email }, 'Switch to account'),
-                h('span', { class: 'spacer' }),
-                ib('moveAccount', 'up', 'Move up', { 'data-direction': 'up', disabled: idx === 0 }),
-                ib('moveAccount', 'down', 'Move down', { 'data-direction': 'down', disabled: idx >= total - 1 }),
-                ib('rename', 'tag', 'Set label'),
-                ib('remove', 'trash', 'Remove account', { class: 'btn icon danger' }))
-        ];
-        return card(id, 'is-other',
-            cardHead(id, ['AG', 'muted'], a.label || a.display, [a.label ? a.display : null, a.snapshotAgo ? `seen ${a.snapshotAgo}` : null], [badge(`#${idx + 1}`, 'rank'), badge(a.planName, 'plan')]),
-            summary, body);
-    }
-
-    function notice(title, text, action) {
-        return h('section', { class: 'card notice' },
-            h('div', { class: 'notice-title' }, title),
-            text ? h('div', { class: 'muted small' }, text) : null,
-            action ? h('div', { class: 'acct-actions' }, action) : null);
-    }
-
-    function saveView() {
-        vscode.setState({ expanded: [...expanded], settingsOpen });
-    }
-
-    function settingControl(i) {
-        if (i.kind === 'bool') {
-            return h('input', { type: 'checkbox', class: 'switch', 'data-setting': i.key, checked: !!i.value, disabled: i.disabled, 'aria-label': i.label });
-        }
-        if (i.kind === 'enum') {
-            return h('select', { 'data-setting': i.key, disabled: i.disabled, 'aria-label': i.label },
-                i.options.map((o, idx) => h('option', { value: String(idx), selected: o.value === i.value }, o.label)));
-        }
-        const list = Array.isArray(i.value) ? i.value.map(n => `${Number(n)}%`).join(', ') + ' left' : String(i.value);
-        return h('span', { class: 'muted' }, list);
-    }
-
-    // Grouped like VS Code Settings; lists such as alert levels are edited there.
-    function settingsPanel(s) {
-        return [
-            h('div', { class: 'set-head' },
-                h('strong', null, 'Settings'),
-                h('button', { class: 'btn', 'data-action': 'toggleSettings' }, 'Done')),
-            ...(s.settings || []).map(g => h('section', { class: 'card set-group' },
-                h('div', { class: 'set-title' }, g.title),
-                g.items.map(i => h('label', { class: `set-row${i.disabled ? ' dim' : ''}`, title: i.help },
-                    h('span', { class: 'set-label' }, i.label), settingControl(i))))),
-            h('div', { class: 'acct-actions' }, h('button', { class: 'btn', 'data-action': 'openSettings' }, 'All settings in VS Code'))
-        ];
-    }
-
-    function render() {
-        if (!state) {
-            root.replaceChildren(h('div', { class: 'muted pad' }, 'Loading...'));
-            return;
-        }
-        const s = state;
-        // Actions live in the view's title bar only, so nothing is shown twice.
-        if (settingsOpen) {
-            root.replaceChildren(...settingsPanel(s));
-            return;
-        }
-        const body = [];
-        if (s.snoozed) {
-            body.push(h('div', { class: 'muted small snoozed' }, 'Alerts snoozed for up to 1 hour. ',
-                h('button', { class: 'link', 'data-action': 'snooze' }, 'Resume')));
-        }
-        if (s.suggestion) body.push(suggestionBanner(s.suggestion));
-        if (s.active) body.push(activeCard(s));
-        if (s.claude.show) {
-            const foot = s.claude.usageEnabled
-                ? (s.claude.usageError ? h('div', { class: 'muted small' }, s.claude.usageError + (s.claude.usageAgo ? `. Showing values from ${s.claude.usageAgo}.` : '')) : null)
-                : h('div', { class: 'acct-actions' }, h('button', { class: 'btn sm', 'data-action': 'enableClaudeLimits' }, 'Show 5-hour and weekly limits'));
-            const ctx = s.claude.context;
-            body.push(toolCard('claude', ['CC', 'cc'], 'Claude Code', [ctx ? ctx.model : 'CLI'], [], s.claude.windows, ctx, foot));
-        }
-        if (s.codex.show) {
-            const cx = s.codex;
-            const info = cx.idle
-                ? `Not used for ${cx.lastUsedAgo.replace(/ ago$/, '')}. Hidden from the status bar until it runs again.`
-                : [cx.credits, cx.windows.length ? `Limits as of ${cx.asOfAgo}` : ''].filter(Boolean).join(' · ');
-            const meta = [cx.idle ? statusDot('Idle', 'idle') : null, cx.context ? cx.context.model : 'CLI'];
-            body.push(toolCard('codex', ['CX', 'cx'], 'Codex', meta, [badge(cx.plan, 'plan')], cx.windows, cx.context,
-                info ? h('div', { class: 'muted small' }, info) : null));
-        }
-        // Missing Antigravity goes below the tools that have data; nothing at all when it is turned off.
-        const agOn = s.antigravityEnabled !== false;
-        if (agOn && !s.active && s.connecting) {
-            body.push(notice('Looking for Antigravity...', '', null));
-        } else if (agOn && !s.active) {
-            body.push(notice('Antigravity not detected', 'Start agy or the Antigravity IDE. Quota Nexus connects to its local server automatically.',
-                h('button', { class: 'btn sm', 'data-action': 'diagnostics' }, 'Show diagnostics')));
-        }
-        if (agOn) {
-            body.push(h('div', { class: 'section-label' }, 'Other accounts', h('span', { class: 'count' }, String(s.others.length))));
-            body.push(...s.others.map((a, i) => otherCard(a, i, s.others.length)));
-            body.push(h('button', { class: 'btn ghost wide', 'data-action': 'signIn' }, icon('plus'), 'Sign in with another account'));
-        }
-        if (!body.length) {
-            body.push(notice('Nothing to show', 'Every tool is turned off or has no data yet.',
-                h('button', { class: 'btn sm', 'data-action': 'toggleSettings' }, 'Open settings')));
-        }
-        body.push(h('footer', null,
-            `Updated ${s.updatedAgo}`, h('span', { class: 'sep' }, '·'), 'Local data only', h('span', { class: 'sep' }, '·'),
-            h('button', { class: 'link', 'data-action': 'diagnostics' }, 'Diagnostics')));
-
-        root.replaceChildren(...body);
-    }
-
-    root.addEventListener('click', (e) => {
-        const el = e.target instanceof Element ? e.target.closest('[data-action]') : null;
-        if (!el || el.hasAttribute('disabled')) return;
-        const action = el.getAttribute('data-action');
-        if (action === 'toggle') {
-            const id = el.getAttribute('data-id');
-            if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
-            saveView();
-            render();
-            return;
-        }
-        if (action === 'toggleSettings') {
-            settingsOpen = !settingsOpen;
-            saveView();
-            render();
-            return;
-        }
-        vscode.postMessage({
-            type: action,
-            email: el.getAttribute('data-email') || undefined,
-            direction: el.getAttribute('data-direction') || undefined
+    function sourceDetails(p) {
+        const details = el('details', 'source-details');
+        details.open = expandedDetails.has(p.id);
+        const summary = el('summary', '', 'Source & reset details');
+        summary.dataset.focus = `source:${p.id}`;
+        details.append(summary);
+        summary.addEventListener('click', (event) => {
+            event.preventDefault();
+            details.open = !details.open;
+            if (details.open) expandedDetails.add(p.id);
+            else expandedDetails.delete(p.id);
         });
-    });
-
-    root.addEventListener('change', (e) => {
-        const el = e.target;
-        if (!(el instanceof HTMLElement) || !el.dataset.setting || !state) return;
-        const item = (state.settings || []).flatMap(g => g.items).find(i => i.key === el.dataset.setting);
-        if (!item) return;
-        const value = item.kind === 'bool' ? /** @type {HTMLInputElement} */ (el).checked : item.options[Number(/** @type {HTMLSelectElement} */ (el).value)].value;
-        shownSig = '';
-        vscode.postMessage({ type: 'setSetting', key: item.key, value });
-    });
-    window.addEventListener('message', (e) => {
-        const msg = e.data;
-        if (msg && msg.type === 'showSettings') {
-            settingsOpen = msg.mode === 'toggle' ? !settingsOpen : true;
-            saveView();
-            render();
-            return;
+        details.append(
+            el('p', 'detail', p.source),
+            el(
+                'p',
+                'detail',
+                `${p.id === 'codex' ? 'Source event' : 'Fetched'}: ${stamp(sourceTime(p))} · ${state.timeZone || 'Asia/Taipei'}`
+            )
+        );
+        for (const g of p.groups)
+            for (const r of g.rows) {
+                const item = el('p', 'detail');
+                item.append(
+                    el('strong', '', `${p.id === 'antigravity' ? g.label + ' · ' : ''}${r.label}: `),
+                    el('span', '', `reset ${resetText(r)} · source ${stamp(r.observedAt)}`)
+                );
+                details.append(item);
+            }
+        if (p.spend) details.append(el('p', 'detail', `Budget reset: ${resetText(p.spend)}`));
+        if (p.models?.length) details.append(el('p', 'detail models', `Models: ${p.models.join(', ')}`));
+        return details;
+    }
+    function preview(p) {
+        const mini = el('div', 'card-preview');
+        if (p.spend && p.primaryMetric !== 'quota') {
+            mini.append(
+                el(
+                    'strong',
+                    'mini-money',
+                    `${money(p.spend.used, p.spend.currency)} / ${money(p.spend.limit, p.spend.currency)}`
+                ),
+                meter(p.spend.usedPct, 'Budget used')
+            );
+        } else {
+            const grid = el('div', 'mini-grid');
+            for (const g of p.groups)
+                for (const r of g.rows) {
+                    const item = el('div', 'mini-item');
+                    const label = `${p.id === 'antigravity' ? g.short + ' ' : ''}${r.label === 'Weekly' ? 'wk' : r.label === '5-hour' ? '5h' : r.label}`;
+                    item.append(
+                        el('span', 'muted', label),
+                        el(
+                            'strong',
+                            '',
+                            `${percent(state.percentMode === 'left' ? r.remainingPct : r.usedPct)}${r.stale && !r.recordedOnly && r.usedPct !== null ? ' ~' : ''}`
+                        )
+                    );
+                    grid.append(item);
+                }
+            mini.append(grid);
         }
-        if (msg && msg.type === 'state') {
-            state = msg.state;
-            const sig = settingsOpen ? JSON.stringify([state.settings, state.snoozed, state.mask]) : '';
-            if (sig && sig === shownSig) return;
-            shownSig = sig;
+        if (p.error) mini.append(el('p', 'problem', p.error));
+        return mini;
+    }
+    function provider(p) {
+        const card = el('section', `card provider-card provider-${p.id}`);
+        card.dataset.provider = p.id;
+        const isCollapsed = collapsed.has(p.id);
+        const heading = el('h2', 'card-heading');
+        const toggle = button('', () => {
+            if (collapsed.has(p.id)) collapsed.delete(p.id);
+            else collapsed.add(p.id);
+            api.setState?.({ collapsed: [...collapsed] });
+            render();
+        });
+        toggle.className = 'provider-toggle';
+        toggle.dataset.focus = `collapse:${p.id}`;
+        toggle.setAttribute('aria-expanded', String(!isCollapsed));
+        toggle.setAttribute('aria-controls', `body-${p.id}`);
+        toggle.setAttribute('aria-label', `${isCollapsed ? 'Expand' : 'Collapse'} ${p.title}`);
+        toggle.append(el('span', 'provider-icon', { antigravity: 'AG', claude: 'CC', codex: 'CX' }[p.id]));
+        const text = el('span', 'provider-label');
+        text.append(el('span', 'provider-title', p.title));
+        const rows = p.groups.flatMap((g) => g.rows);
+        const hasData = typeof p.spend?.used === 'number' || rows.some((r) => r.usedPct !== null);
+        const issue = p.error || p.spend?.status === 'unsupported';
+        const stale = p.spend?.stale || rows.some((r) => r.stale && !r.recordedOnly && r.usedPct !== null);
+        const recorded = rows.some((r) => r.recordedOnly);
+        const status = el('span', 'provider-status');
+        status.append(
+            el('span', `status-dot ${issue || stale ? 'stale-dot' : recorded ? '' : hasData ? 'active-dot' : ''}`),
+            el(
+                'span',
+                '',
+                `${issue ? (hasData ? 'Needs attention' : 'Unavailable') : stale ? 'Stale' : recorded ? 'Last recorded' : hasData ? 'Active' : 'Waiting'} · ${age(sourceTime(p))}`
+            )
+        );
+        text.append(status);
+        toggle.append(text);
+        if (p.plan && !p.title.toLowerCase().includes(p.plan.toLowerCase())) {
+            const plan = badge(p.plan.replace(/^Google AI /, ''));
+            plan.title = p.plan;
+            toggle.append(plan);
+        }
+        toggle.append(el('span', isCollapsed ? 'chevron' : 'chevron expanded'));
+        heading.append(toggle);
+        card.append(heading);
+        const body = el('div', 'card-body');
+        body.id = `body-${p.id}`;
+        body.hidden = isCollapsed;
+        if (p.error) body.append(el('p', 'problem', `${p.error}. Last successful values, if any, are retained.`));
+        if (p.notice) body.append(el('p', 'problem', p.notice));
+        if (p.spend && p.primaryMetric !== 'quota') body.append(spend(p.spend));
+        let count = 0;
+        for (const g of p.groups) {
+            if (!g.rows.length) continue;
+            const group = el('div', 'group');
+            const title = el('div', 'group-heading');
+            title.append(el('h3', '', g.label));
+            if (count === 0)
+                title.append(el('span', 'legend', `${state.percentMode === 'left' ? 'Left' : 'Used'} · Resets in`));
+            group.append(title);
+            g.rows.forEach((r) => group.append(quota(r)));
+            body.append(group);
+            count += g.rows.length;
+        }
+        if (p.spend && p.primaryMetric === 'quota') body.append(spend(p.spend));
+        if (!p.spend && !count) body.append(el('p', 'problem', 'Usage unknown. No valid reading yet.'));
+        if (state.showContext && p.context) body.append(contextView(p.context));
+        if (p.credits && Object.keys(p.credits).length) {
+            const credits = el('div', 'credits');
+            for (const [kind, label] of [
+                ['prompt', 'Prompt credits left'],
+                ['flow', 'Flow credits left']
+            ])
+                if (p.credits[kind]) {
+                    const line = el('div', 'credit-line');
+                    line.append(
+                        el('span', '', label),
+                        el(
+                            'span',
+                            '',
+                            `${creditCount(p.credits[kind].available)} / ${creditCount(p.credits[kind].monthly)}`
+                        )
+                    );
+                    credits.append(line);
+                }
+            body.append(credits);
+        }
+        body.append(sourceDetails(p));
+        const mini = preview(p);
+        mini.hidden = !isCollapsed;
+        card.append(body, mini);
+        return card;
+    }
+    function settings() {
+        const panel = el('section', 'card settings');
+        panel.append(el('h2', '', 'Display & monitoring'));
+        for (const g of state.settings || []) {
+            panel.append(el('h3', '', g.title));
+            if (g.title === 'Status Bar')
+                panel.append(el('p', 'detail status-bar-note', 'Status bar space is limited; only selected summaries are shown. Hover or open the dashboard for all limits.'));
+            for (const item of g.items) {
+                const label = el('label', 'setting');
+                label.append(el('span', '', item.label));
+                label.title = item.help;
+                const input = el(item.kind === 'bool' ? 'input' : 'select');
+                input.disabled = item.disabled;
+                input.dataset.focus = `setting:${item.key}`;
+                if (item.kind === 'bool') {
+                    input.type = 'checkbox';
+                    input.checked = item.value;
+                } else
+                    for (const option of item.options || []) {
+                        const o = el('option', '', option.label);
+                        o.value = JSON.stringify(option.value);
+                        o.selected = option.value === item.value;
+                        input.append(o);
+                    }
+                input.addEventListener('change', () =>
+                    api.postMessage({
+                        type: 'setSetting',
+                        key: item.key,
+                        value: item.kind === 'bool' ? input.checked : JSON.parse(input.value)
+                    })
+                );
+                label.append(input);
+                panel.append(label);
+            }
+        }
+        return panel;
+    }
+    function render() {
+        if (!state) return;
+        const focus = document.activeElement?.dataset?.focus;
+        const fragment = document.createDocumentFragment();
+        const header = el('header');
+        const title = el('div');
+        title.append(
+            el('h1', 'sr-only', 'Nexus AI Usage'),
+            el(
+                'p',
+                'muted',
+                `${state.percentMode === 'left' ? 'Remaining' : 'Used'} · ${state.timeZone || 'Asia/Taipei'}`
+            )
+        );
+        header.append(title, badge('PREVIEW'));
+        fragment.append(header);
+        const actions = el('nav', 'actions');
+        actions.setAttribute('aria-label', 'Usage actions');
+        actions.append(
+            button('Refresh', () => api.postMessage({ type: 'refresh' })),
+            button('Settings', () => {
+                showSettings = !showSettings;
+                render();
+            }),
+            button('Diagnostics', () => api.postMessage({ type: 'diagnostics' }))
+        );
+        fragment.append(actions);
+        if (showSettings) fragment.append(settings());
+        for (const p of state.providers || []) fragment.append(provider(p));
+        if (!state.providers?.length)
+            fragment.append(el('p', 'problem', 'All providers are disabled. Enable monitoring in Settings.'));
+        fragment.append(el('footer', 'muted', 'Unknown = no reading · ~ = stale. Values retain their source time.'));
+        root.replaceChildren(fragment);
+        if (focus)
+            [...root.querySelectorAll('[data-focus]')]
+                .find((node) => node.dataset.focus === focus)
+                ?.focus({ preventScroll: true });
+    }
+    window.addEventListener('message', (event) => {
+        if (event.data?.type === 'state') {
+            state = event.data.state;
+            render();
+        }
+        if (event.data?.type === 'showSettings') {
+            showSettings = event.data.mode === 'open' || !showSettings;
             render();
         }
     });
-
-    render();
-    vscode.postMessage({ type: 'ready' });
-}());
+    api.postMessage({ type: 'ready' });
+})();

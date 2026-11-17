@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Verify tag matches package.json version
+        run: |
+          node -e "
+            const expected = 'v' + require('./package.json').version;
+            const actual = process.env.GITHUB_REF_NAME;
+            if (actual !== expected) {
+              console.error('Release tag', actual, 'does not match package.json version', expected);
+              process.exit(1);
+            }
+          "
+      - name: Install development tools
+        run: npm ci --ignore-scripts
+      - name: Syntax check
+        run: npm run check
+      - name: Unit tests
+        run: npm test
+      - name: Install local browser and system libraries
+        run: npx playwright install --with-deps chromium --only-shell
+      - name: Verify synthetic dashboard states
+        run: npm run test:ui
+      - name: Package VSIX
+        run: npm run package
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VSIX_FILE="$(node -p "'artifacts/' + require('./package.json').name + '-' + require('./package.json').version + '.vsix'")"
+          test -f "$VSIX_FILE"
+          gh release create "$TAG_NAME" "$VSIX_FILE" \
+            --title "$TAG_NAME" \
+            --generate-notes

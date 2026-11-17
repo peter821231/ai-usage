@@ -3,8 +3,15 @@
 const http = require('http');
 const { execFile } = require('child_process');
 const {
-    parseUserStatus, parseProcessLines, parseNetstatListening, parseLsofListening,
-    pickTrajectory, parseGeneratorMetadata, orderPorts, newestFirst, parseQuotaSummary, limitsMatch
+    parseUserStatus,
+    parseProcessLines,
+    parseNetstatListening,
+    parseLsofListening,
+    pickTrajectory,
+    parseGeneratorMetadata,
+    orderPorts,
+    newestFirst,
+    parseQuotaSummary
 } = require('./parse');
 
 const META = { metadata: { ideName: 'antigravity', extensionName: 'antigravity', locale: 'en' } };
@@ -19,39 +26,50 @@ const IS_WIN = process.platform === 'win32';
 
 function run(cmd, args, timeout = 6000) {
     return new Promise((resolve) => {
-        execFile(cmd, args, { encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
-            (err, stdout) => resolve(err && !stdout ? '' : (stdout || '')));
+        execFile(
+            cmd,
+            args,
+            { encoding: 'utf8', timeout, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+            (err, stdout) => resolve(err && !stdout ? '' : stdout || '')
+        );
     });
 }
 
 function rpc(port, csrf, name, body, timeout = 4000) {
     return new Promise((resolve, reject) => {
         const payload = JSON.stringify(body || {});
-        const req = http.request({
-            hostname: '127.0.0.1',
-            port,
-            path: RPC_PATH + name,
-            method: 'POST',
-            timeout,
-            headers: {
-                'Content-Type': 'application/json',
-                'Content-Length': Buffer.byteLength(payload),
-                'Connect-Protocol-Version': '1',
-                'X-Codeium-Csrf-Token': csrf
+        const req = http.request(
+            {
+                hostname: '127.0.0.1',
+                port,
+                path: RPC_PATH + name,
+                method: 'POST',
+                timeout,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Content-Length': Buffer.byteLength(payload),
+                    'Connect-Protocol-Version': '1',
+                    'X-Codeium-Csrf-Token': csrf
+                }
+            },
+            (res) => {
+                const chunks = [];
+                let size = 0;
+                res.on('data', (c) => {
+                    size += c.length;
+                    if (size > MAX_BODY_BYTES) return req.destroy(new Error('RESPONSE_TOO_LARGE'));
+                    chunks.push(c);
+                });
+                res.on('end', () => {
+                    if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+                    try {
+                        resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
             }
-        }, (res) => {
-            const chunks = [];
-            let size = 0;
-            res.on('data', c => {
-                size += c.length;
-                if (size > MAX_BODY_BYTES) return req.destroy(new Error('RESPONSE_TOO_LARGE'));
-                chunks.push(c);
-            });
-            res.on('end', () => {
-                if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
-                try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch (e) { reject(e); }
-            });
-        });
+        );
         req.on('error', reject);
         req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
         req.end(payload);
@@ -60,7 +78,8 @@ function rpc(port, csrf, name, body, timeout = 4000) {
 
 async function listProcesses() {
     if (IS_WIN) {
-        const ps = "Get-CimInstance Win32_Process -Filter \"Name LIKE 'agy%' OR Name LIKE 'language_server%'\" | " +
+        const ps =
+            "Get-CimInstance Win32_Process -Filter \"Name LIKE 'agy%' OR Name LIKE 'language_server%'\" | " +
             "ForEach-Object { [string]$_.ProcessId + ' ' + [string]([DateTimeOffset]$_.CreationDate).ToUnixTimeMilliseconds() + ' ' + $_.CommandLine }";
         return parseProcessLines(await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', ps]));
     }
@@ -80,7 +99,14 @@ function firstOk(promises) {
         let pending = promises.length;
         if (pending === 0) return resolve(null);
         for (const p of promises) {
-            p.then(v => { if (v) resolve(v); }, () => {}).finally(() => { if (--pending === 0) resolve(null); });
+            p.then(
+                (v) => {
+                    if (v) resolve(v);
+                },
+                () => {}
+            ).finally(() => {
+                if (--pending === 0) resolve(null);
+            });
         }
     });
 }
@@ -98,7 +124,14 @@ class AgyClient {
         this.limitsCache = null;
         this.others = [];
         this.lastDiscoveryAt = 0;
-        this.diag = { lastOkAt: 0, lastError: '', processes: 0, probed: 0, lastDiscoveryAt: 0, limits: 'not asked yet' };
+        this.diag = {
+            lastOkAt: 0,
+            lastError: '',
+            processes: 0,
+            probed: 0,
+            lastDiscoveryAt: 0,
+            limits: 'not asked yet'
+        };
     }
 
     fail(msg) {
@@ -107,8 +140,10 @@ class AgyClient {
     }
 
     probe(port, csrf, pid, started) {
-        return rpc(port, csrf, 'GetUserStatus', META, 2500)
-            .then(data => (data && data.userStatus ? { port, csrf, pid, started, data } : null), () => null);
+        return rpc(port, csrf, 'GetUserStatus', META, 2500).then(
+            (data) => (data && data.userStatus ? { port, csrf, pid, started, data } : null),
+            () => null
+        );
     }
 
     // Other live agy servers (often a different account); read once, then cleared.
@@ -129,11 +164,16 @@ class AgyClient {
         this.discovering = (async () => {
             const procs = await listProcesses();
             const netstatCache = {};
-            const plans = await Promise.all(procs.map(async p => ({ p, ...orderPorts(p.ports, await listeningPorts(p.pid, netstatCache)) })));
+            const plans = await Promise.all(
+                procs.map(async (p) => ({ p, ...orderPorts(p.ports, await listeningPorts(p.pid, netstatCache)) }))
+            );
             // One answer per process (its first port that replies), then the newest process wins.
             const perProc = plans.map(({ p, ports, verified }) => {
-                if (!verified) this.log.info(`Antigravity: could not verify ports of pid ${p.pid}; using its command-line ports only`);
-                return firstOk(ports.map(port => this.probe(port, p.csrf, p.pid, p.started)));
+                if (!verified)
+                    this.log.info(
+                        `Antigravity: could not verify ports of pid ${p.pid}; using its command-line ports only`
+                    );
+                return firstOk(ports.map((port) => this.probe(port, p.csrf, p.pid, p.started)));
             });
             const probed = plans.reduce((n, x) => n + x.ports.length, 0);
             const all = newestFirst((await Promise.all(perProc)).filter(Boolean));
@@ -146,14 +186,26 @@ class AgyClient {
             if (found) {
                 const changed = !this.server || this.server.pid !== found.pid;
                 this.server = { port: found.port, csrf: found.csrf, pid: found.pid };
-                this.others = all.slice(1).map(f => parseUserStatus(f.data)).filter(Boolean);
-                if (changed) this.log.info(`Antigravity: connected to pid ${found.pid} on port ${found.port}${all.length > 1 ? ` (newest of ${all.length} servers)` : ''}`);
+                this.others = all
+                    .slice(1)
+                    .map((f) => parseUserStatus(f.data))
+                    .filter(Boolean);
+                if (changed)
+                    this.log.info(
+                        `Antigravity: connected to pid ${found.pid} on port ${found.port}${all.length > 1 ? ` (newest of ${all.length} servers)` : ''}`
+                    );
             } else {
                 this.lastFailedDiscovery = Date.now();
-                this.fail(procs.length ? `found ${procs.length} process(es) but no port answered` : 'no agy or language server process found');
+                this.fail(
+                    procs.length
+                        ? `found ${procs.length} process(es) but no port answered`
+                        : 'no agy or language server process found'
+                );
             }
             return found;
-        })().finally(() => { this.discovering = null; });
+        })().finally(() => {
+            this.discovering = null;
+        });
         return this.discovering;
     }
 
@@ -194,23 +246,31 @@ class AgyClient {
         const key = `${s.pid}|${String(status.email || '').toLowerCase()}`;
         const now = Date.now();
         const c = this.limitsCache && this.limitsCache.key === key ? this.limitsCache : null;
-        const bad = r => !!r && !limitsMatch(status.pools, r);
-        if (c && now - c.at < (bad(c.result) ? LIMITS_RETRY_MS : LIMITS_MIN_GAP_MS)) return bad(c.result) ? null : c.result;
-        // agy can hand back the previous account's summary after a switch, so skip its cache then.
-        const force = !c || bad(c.result);
-        let result = c ? c.result : null;
-        try {
-            result = parseQuotaSummary(await rpc(s.port, s.csrf, 'RetrieveUserQuotaSummary', force ? { forceRefresh: true } : {}, 8000));
-            this.diag.limits = result ? `ok (${result.map(g => `${g.name}: ${g.windows.map(w => w.name).join(', ')}`).join('; ')})` : 'answered with no limits';
-        } catch (e) {
-            const msg = `failed (${e.message})`;
-            if (this.diag.limits !== msg) this.log.info(`Antigravity limits: ${msg}`);
-            this.diag.limits = msg;
+        if (c && now - c.at < (c.error ? LIMITS_RETRY_MS : LIMITS_MIN_GAP_MS)) {
+            this.limitsFetchedAt = c.fetchedAt;
+            this.limitsError = c.error;
+            return c.result;
         }
-        this.limitsCache = { key, at: now, result };
-        if (!bad(result)) return result;
-        this.diag.limits = 'ignored: they do not match this account\'s quota (retrying)';
-        return null;
+        let result = c?.result || null;
+        let fetchedAt = c?.fetchedAt || null;
+        let error = '';
+        try {
+            const next = parseQuotaSummary(
+                await rpc(s.port, s.csrf, 'RetrieveUserQuotaSummary', !c ? { forceRefresh: true } : {}, 8000)
+            );
+            if (!next) error = 'Quota summary contains no usable groups';
+            else {
+                result = next;
+                fetchedAt = Date.now();
+            }
+        } catch {
+            error = 'Quota summary request failed';
+        }
+        this.limitsCache = { key, at: now, fetchedAt, result, error };
+        this.limitsFetchedAt = fetchedAt;
+        this.limitsError = error;
+        this.diag.limits = error || 'available';
+        return result;
     }
 
     async getContext(wsPaths, modelLabels) {

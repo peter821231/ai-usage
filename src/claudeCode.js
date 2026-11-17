@@ -2,19 +2,18 @@
 
 const fsp = require('fs').promises;
 const path = require('path');
-const https = require('https');
-const { contextWindowFor, formatTokens, clampPct } = require('./util');
+const { contextWindowFor, formatTokens } = require('./util');
 
 const TAIL_STEPS = [64 * 1024, 1024 * 1024, 8 * 1024 * 1024];
 const FALLBACK_DIRS = 5;
-const MAX_BODY_BYTES = 1024 * 1024;
 // A workspace session older than this loses to the newest session anywhere.
 const FRESH_MS = 12 * 3600e3;
-const USER_AGENT = `quota-nexus/${require('../package.json').version}`;
 
 // Claude Code names each project folder after its cwd with non-alphanumerics as '-'.
 function encodeProjectDir(p) {
-    return String(p || '').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    return String(p || '')
+        .replace(/[^a-zA-Z0-9]/g, '-')
+        .toLowerCase();
 }
 
 function findLastUsage(lines) {
@@ -22,7 +21,11 @@ function findLastUsage(lines) {
         const line = lines[i];
         if (!line.includes('"usage"')) continue;
         let obj;
-        try { obj = JSON.parse(line); } catch (e) { continue; }
+        try {
+            obj = JSON.parse(line);
+        } catch (e) {
+            continue;
+        }
         if (!obj || obj.isSidechain) continue;
         const msg = obj.message;
         if (!msg || !msg.usage || msg.model === '<synthetic>') continue;
@@ -48,32 +51,40 @@ async function readTail(file, size, bytes) {
 
 function buildContext(found, mtime) {
     const u = found.usage;
-    const n = v => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0);
+    const n = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : null);
     const inputTokens = n(u.input_tokens);
     const cacheRead = n(u.cache_read_input_tokens);
     const cacheCreation = n(u.cache_creation_input_tokens);
     const outputTokens = n(u.output_tokens);
-    const thinkingTokens = n(u.thinking_tokens || (u.reasoning_tokens || 0));
-    const usedTokens = inputTokens + cacheRead + cacheCreation;
+    const thinkingTokens = n(u.thinking_tokens || u.reasoning_tokens || 0);
+    const total = inputTokens + cacheRead + cacheCreation;
+    const known = [inputTokens, cacheRead, cacheCreation].every((v) => v !== null) && Number.isFinite(total);
+    const usedTokens = known ? total : null;
     const windowTokens = contextWindowFor(found.model);
     return {
         source: 'claudeCode',
         model: found.model || 'Claude',
         usedTokens,
         windowTokens,
-        pct: Math.min(100, Math.round((usedTokens / windowTokens) * 1000) / 10),
+        pct: known ? Math.min(100, Math.round((usedTokens / windowTokens) * 1000) / 10) : null,
         inputTokens,
         cacheReadTokens: cacheRead,
         cacheCreationTokens: cacheCreation,
         outputTokens,
         thinkingTokens,
-        left: `${formatTokens(Math.max(0, windowTokens - usedTokens))} / ${formatTokens(windowTokens)}`,
+        left: known
+            ? `${formatTokens(Math.max(0, windowTokens - usedTokens))} / ${formatTokens(windowTokens)}`
+            : 'Unknown',
         timestamp: found.timestamp || mtime
     };
 }
 
 async function statSafe(p) {
-    try { return await fsp.stat(p); } catch (e) { return null; }
+    try {
+        return await fsp.stat(p);
+    } catch (e) {
+        return null;
+    }
 }
 
 class ClaudeContextReader {
@@ -84,25 +95,32 @@ class ClaudeContextReader {
 
     async dirNames() {
         try {
-            return (await fsp.readdir(this.projectsDir, { withFileTypes: true })).filter(e => e.isDirectory()).map(e => e.name);
+            return (await fsp.readdir(this.projectsDir, { withFileTypes: true }))
+                .filter((e) => e.isDirectory())
+                .map((e) => e.name);
         } catch (e) {
             return [];
         }
     }
 
     async recentDirs(dirs) {
-        const stats = await Promise.all(dirs.map(async d => {
-            const full = path.join(this.projectsDir, d);
-            const st = await statSafe(full);
-            return { full, mtime: st ? st.mtimeMs : 0 };
-        }));
-        return stats.sort((a, b) => b.mtime - a.mtime).slice(0, FALLBACK_DIRS).map(s => s.full);
+        const stats = await Promise.all(
+            dirs.map(async (d) => {
+                const full = path.join(this.projectsDir, d);
+                const st = await statSafe(full);
+                return { full, mtime: st ? st.mtimeMs : 0 };
+            })
+        );
+        return stats
+            .sort((a, b) => b.mtime - a.mtime)
+            .slice(0, FALLBACK_DIRS)
+            .map((s) => s.full);
     }
 
     async candidateFiles(wsPaths) {
         const dirs = await this.dirNames();
         const wanted = new Set((wsPaths || []).map(encodeProjectDir));
-        const preferred = dirs.filter(d => wanted.has(d.toLowerCase())).map(d => path.join(this.projectsDir, d));
+        const preferred = dirs.filter((d) => wanted.has(d.toLowerCase())).map((d) => path.join(this.projectsDir, d));
         if (preferred.length) {
             const files = await this.newestFiles(preferred);
             if (files.length && Date.now() - files[0].mtime <= FRESH_MS) return files;
@@ -112,15 +130,25 @@ class ClaudeContextReader {
 
     async newestFiles(dirs) {
         const files = [];
-        await Promise.all(dirs.map(async dir => {
-            let names;
-            try { names = await fsp.readdir(dir); } catch (e) { return; }
-            await Promise.all(names.filter(n => n.endsWith('.jsonl')).map(async n => {
-                const full = path.join(dir, n);
-                const st = await statSafe(full);
-                if (st) files.push({ path: full, mtime: st.mtimeMs, size: st.size });
-            }));
-        }));
+        await Promise.all(
+            dirs.map(async (dir) => {
+                let names;
+                try {
+                    names = await fsp.readdir(dir);
+                } catch (e) {
+                    return;
+                }
+                await Promise.all(
+                    names
+                        .filter((n) => n.endsWith('.jsonl'))
+                        .map(async (n) => {
+                            const full = path.join(dir, n);
+                            const st = await statSafe(full);
+                            if (st) files.push({ path: full, mtime: st.mtimeMs, size: st.size });
+                        })
+                );
+            })
+        );
         return files.sort((a, b) => b.mtime - a.mtime).slice(0, 3);
     }
 
@@ -131,7 +159,11 @@ class ClaudeContextReader {
             if (c && c.path === f.path && c.mtime === f.mtime && c.size === f.size) return c.result;
             let found = null;
             for (const step of TAIL_STEPS) {
-                try { found = findLastUsage(await readTail(f.path, f.size, step)); } catch (e) { break; }
+                try {
+                    found = findLastUsage(await readTail(f.path, f.size, step));
+                } catch (e) {
+                    break;
+                }
                 if (found || step >= f.size) break;
             }
             if (found) {
@@ -144,85 +176,12 @@ class ClaudeContextReader {
     }
 }
 
-// Retry-After is seconds or an HTTP date; capped at 1 hour.
-function retryAfterMs(h, now = Date.now()) {
-    if (typeof h !== 'string' || !h.trim()) return 0;
-    const ms = /^\d+$/.test(h.trim()) ? Number(h) * 1000 : Date.parse(h) - now;
-    return isFinite(ms) && ms > 0 ? Math.min(ms, 3600e3) : 0;
-}
-
-function getJson(url, headers, timeout = 8000) {
-    return new Promise((resolve) => {
-        const req = https.request(url, {
-            method: 'GET',
-            timeout,
-            headers: { Accept: 'application/json', 'User-Agent': USER_AGENT, ...headers }
-        }, (res) => {
-            const chunks = [];
-            let size = 0;
-            res.on('data', c => {
-                size += c.length;
-                if (size > MAX_BODY_BYTES) return req.destroy(new Error('RESPONSE_TOO_LARGE'));
-                chunks.push(c);
-            });
-            res.on('end', () => {
-                let json = null;
-                try { json = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch (e) { /* non-JSON body */ }
-                resolve({ status: res.statusCode, data: json, retryAfterMs: retryAfterMs(res.headers['retry-after']) });
-            });
-        });
-        req.on('error', () => resolve({ status: 0, data: null }));
-        req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
-        req.end();
-    });
-}
-
-const USAGE_FORCE_GAP_MS = 60e3;
-const USAGE_BACKOFF_MAX_MS = 30 * 60e3;
-
-// Schedule is shared by every window: one request per gap, doubling the wait after each failure.
-function usageDue(shared, now, gapMs, force) {
-    const s = shared || {};
-    if (now < (s.until || 0)) return false;
-    return now - (s.at || 0) >= (force ? USAGE_FORCE_GAP_MS : gapMs);
-}
-
-function usageResult(shared, r, now, gapMs) {
-    const s = shared || {};
-    if (!r.error) return { at: now, data: r, fails: 0, until: 0, error: '' };
-    if (r.noRequest) return { ...s, error: r.error };
-    const fails = (s.fails || 0) + 1;
-    const wait = Math.max(r.retryAfterMs || 0, Math.min(USAGE_BACKOFF_MAX_MS, gapMs * 2 ** (fails - 1)));
-    return { ...s, at: now, fails, until: now + wait, error: r.error };
-}
-
-// Opt-in. Read-only: never refreshes or rewrites the Claude Code token file.
-async function fetchClaudeUsage(home) {
-    let creds;
-    try {
-        creds = JSON.parse(await fsp.readFile(path.join(home, '.claude', '.credentials.json'), 'utf8'));
-    } catch (e) {
-        return { error: 'Claude Code sign-in file not found', noRequest: true };
-    }
-    const o = creds && creds.claudeAiOauth;
-    if (!o || typeof o.accessToken !== 'string' || !/^[\x21-\x7e]{10,4096}$/.test(o.accessToken)) {
-        return { error: 'Claude Code is not signed in', noRequest: true };
-    }
-    if (o.expiresAt && Date.now() >= o.expiresAt - 60000) {
-        return { error: 'Token expired - run Claude Code once to renew it', noRequest: true };
-    }
-    const res = await getJson('https://api.anthropic.com/api/oauth/usage', {
-        Authorization: `Bearer ${o.accessToken}`,
-        'anthropic-beta': 'oauth-2025-04-20'
-    });
-    const d = res.data;
-    if (res.status === 429) return { error: 'Anthropic is rate-limiting usage requests - retrying later', limited: true, retryAfterMs: res.retryAfterMs };
-    if (res.status !== 200 || !d || !d.five_hour) return { error: `Usage request failed (HTTP ${res.status || 'error'})` };
-    const win = w => ({
-        pct: Math.round(clampPct(w && w.utilization)),
-        resetsAt: w && typeof w.resets_at === 'string' && !isNaN(Date.parse(w.resets_at)) ? w.resets_at : null
-    });
-    return { updatedAt: Date.now(), fiveHour: win(d.five_hour), weekly: win(d.seven_day) };
-}
-
-module.exports = { ClaudeContextReader, fetchClaudeUsage, retryAfterMs, usageDue, usageResult, findLastUsage, encodeProjectDir, readTail, statSafe, TAIL_STEPS, FRESH_MS };
+module.exports = {
+    ClaudeContextReader,
+    findLastUsage,
+    encodeProjectDir,
+    readTail,
+    statSafe,
+    TAIL_STEPS,
+    FRESH_MS
+};

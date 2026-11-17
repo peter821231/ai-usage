@@ -1,3 +1,98 @@
+# Nexus AI Usage changelog
+
+## 0.1.6 — 2026-11-17 (Preview)
+
+- Default Antigravity's status summary to Gemini Models 5-hour / Weekly and
+  independent Gemini 4 Argon Weekly. Add five validated per-window checkboxes,
+  including optional Claude/GPT windows, in both dashboard and native settings.
+- Keep the complete hover/dashboard independent of status selections. Omit the
+  Antigravity summary if every window is deselected and ignore unselected-window
+  warnings when rendering the selected summary.
+- Explain limited/shared status bar space without inventing a fixed character cap
+  or silently truncating quota/money values.
+- Show old Codex events as neutral Last recorded data, preserve source timestamps,
+  amounts and pending resets, and reserve Codex's yellow background for read errors.
+  No provider query or credential handling changes.
+
+## 0.1.5 — 2026-11-16 (Preview)
+
+- Fix hidden providers affecting status-bar warning colors; hide the item when all
+  providers are excluded. Keep missing core personal subscription windows Unknown.
+- Continue Codex tail expansion until a rate-limit event is found, and keep missing
+  or invalid Claude context token components Unknown instead of reporting zero.
+- Validate workspace enum/boolean values before using timers or monitoring switches.
+- Remove inactive account, alert, history and legacy view-state code and obsolete
+  tests; preserve current source-reading coverage with focused regression tests.
+- Allowlist VSIX contents, protect local secret files with Git ignores, preserve
+  local notice links and remove misleading upstream repository metadata.
+- Override the development-only minimatch dependency to 11.0.1 for
+  GHSA-g3hv-75wg-m249; add npm development-tool updates to Dependabot.
+- Record bounded security/code-review evidence and remaining live-account limits.
+
+## 0.1.4 — 2026-11-16 (Preview)
+
+- Reduce card header and body padding, quota-row height, card gaps and secondary
+  section spacing. Preserve existing quota labels, resets, model scopes, error
+  states, collapse controls and separate budget/context sections.
+- Keep quota percentages at their previous font size; reduce provider icons and
+  headline spend slightly instead of shrinking all text.
+- Capture demo previews around actual panel content and record layout dimensions
+  for consistent visual comparison. Existing data sources and policies are unchanged.
+
+## 0.1.3 — 2026-11-16 (Preview)
+
+- Keep Pro / Max subscription quotas primary in the status bar, expanded card
+  and collapsed preview when extra spending is also present. Show extra usage
+  as a separate budget and preserve Enterprise's spend-first presentation.
+- Preserve source-provided personal 5-hour, weekly and model-specific resets;
+  the Enterprise monthly rule never assigns personal reset dates.
+- Give legacy model-scoped windows readable labels. Keep reported windows with
+  invalid or missing percentages visible as Unknown instead of dropping them.
+- Add artificial Pro / Max regression coverage for both CLI usage formats,
+  optional/unsupported extra spending, stale data, collapse and narrow panels.
+  Personal account live comparison remains unverified.
+
+## 0.1.2 — 2026-11-16 (Preview)
+
+- Add the official Enterprise monthly reset policy, confirmed against the user's
+  personal Usage screen: first of the month at 00:00 UTC (08:00 Asia/Taipei).
+- Clearly label calculated policy dates instead of claiming the CLI returns them;
+  provider timestamps take precedence and source-only behavior remains selectable.
+- Pin each derived reset to the usage reading's month. An expired cached reading
+  stays stale/pending with its original dollar spend, never auto-zeroed.
+- Preserve explicit non-monthly source periods and do not apply the rule to other
+  plans or unsupported money formats. No organization key or cloud service added.
+
+## 0.1.1 — 2026-11-16 (Preview)
+
+- Restore compact provider cards with AG / CC / CX badges, inline progress bars,
+  per-window reset countdowns, and persistent collapse state.
+- Restore status bar hover usage charts with unambiguous Argon group names.
+- Keep Enterprise account spend and Context in separate visual sections; retain
+  source-provided Antigravity credits and model labels without extra queries.
+- Put verbose source/reset metadata in an optional disclosure, and retain keyboard
+  focus and disclosure state during automatic updates.
+- Keep 0.1.0 authentication, money and freshness semantics; unknown reset remains
+  unknown rather than inferring a billing date.
+
+## 0.1.0 — 2026-11-16 (Preview)
+
+- Independent extension, command, view, settings and cache identities.
+- Antigravity Gemini Models, Claude and GPT models, and Gemini 4 Argon remain
+  distinct; no pool inference from equal percentages or reset times.
+- Official Claude Code CLI usage transport, Enterprise spend parsing and shared
+  host cache/lease. No direct Claude credential-file reader or model prompts.
+- Explicit missing, error and stale states. Elapsed resets retain observations.
+- One monitoring status bar and detailed panel; context is separate and optional.
+- Preserved MIT notices, reproducible development-tool lockfile, unit/browser
+  tests, and isolated VSIX packaging. No account switching or cloud service.
+
+The entries below are the original Quota Nexus history. Source baseline:
+`4e229eb0330ca939086f14d288e04b04e5d40d54` (package 1.2.8), compared with
+Open VSX 1.2.10. This preview is not an upstream release.
+
+---
+
 # Changelog
 
 ## [1.2.8] - 2026-10-15

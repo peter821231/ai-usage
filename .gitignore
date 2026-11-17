@@ -1,3 +1,18 @@
 node_modules/
 *.vsix
 *.log
+
+artifacts/
+.agents/
+
+# Machine-local authentication and secrets must stay outside version control.
+.aws/
+.codex/
+.claude/
+.env
+.env.*
+.npmrc
+*.pem
+*.key
+credentials.json
+**/credentials.json

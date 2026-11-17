@@ -1,36 +1,38 @@
-# Security Policy
+# Security and data boundaries
 
-## Supported versions
+This is an independent local preview derived from Quota Nexus. It has no public
+security-reporting service. Report issues privately to the maintainer of your
+copy; do not attach tokens, Cookies, credential files, raw CLI output or complete
+session logs.
 
-Only the latest release gets security fixes.
+The official Claude CLI owns authentication. The monitor does not open Claude
+credential files, perform sign-in, refresh tokens itself or send model prompts.
+Antigravity discovery uses a local session token in memory to talk to loopback;
+Codex and optional context readers inspect local log tails. The extension is not
+an assertion that those sources are free of sensitive data.
 
-| Version | Supported |
-|---|---|
-| 1.2.x | Yes |
-| Older | No |
+Normalized Claude usage is cached in this extension's storage, with restrictive
+file permissions where supported. Raw CLI stdout/stderr and account identifiers
+are not persisted. Webview messages are allowlisted; setting updates are limited
+to declared boolean/enum values. Display strings use text nodes or Markdown
+escaping. The webview uses a nonce CSP and local media resources.
 
-## Reporting a problem
+The Claude cache belongs to one extension host and is not account keyed. After
+changing the official tool's login, confirm a successful new reading and its
+Fetched time before treating cached usage as the new account's data. This preview
+does not promise concurrent monitoring or isolation between multiple Claude logins
+under the same OS user.
 
-Please **do not open a public issue** for security problems.
+Workspace settings are validated against declared enum/boolean types on read as
+well as on webview updates, preventing invalid timer values from becoming rapid
+polling. The VSIX uses a runtime-file allowlist; local .env, credential folders,
+tests and audit reports are excluded. A passing scan is bounded evidence, not a
+guarantee that installed tools, OS permissions or provider protocols are secure.
 
-Report it privately instead: open this repository's **Security** tab and click **Report a vulnerability**. Include:
+Keep the original monitors available until the preview passes official-data
+comparison. An unknown value, failed query or expired source is never treated as
+zero. Internal provider protocols can change; diagnostics should show an error
+instead of initiating a sign-in or requesting credentials.
 
-- what you found and how to reproduce it;
-- the Quota Nexus version, VS Code version and operating system;
-- what an attacker could do with it.
-
-We aim to reply within 3 working days and to ship a fix for confirmed issues within 14 days. We will credit you in the changelog unless you ask us not to.
-
-## What Quota Nexus touches
-
-These are the parts most worth testing:
-
-- **Local Antigravity server.** Nexus reads the port and local session token from the `agy` or language-server command line. It sends the token only to `127.0.0.1`, and only to ports that process is confirmed to listen on.
-- **Claude Code token (opt-in, off by default).** Nexus reads `~/.claude/.credentials.json`, sends the token only to `api.anthropic.com` over HTTPS, and never stores, refreshes, logs or rewrites it.
-- **Local logs.** Nexus reads `~/.claude/projects` and `~/.codex/sessions`. It only reads them.
-- **Webview.** It has a strict Content Security Policy with a nonce, accepts only a fixed set of message types, and renders all data as plain text.
-
-## Out of scope
-
-- Problems in Antigravity, Claude Code or Codex themselves.
-- Attacks that need an attacker already running code as your user account.
+The MIT licenses for original and adapted code are preserved in LICENSE and
+THIRD-PARTY-NOTICES.md. The official Claude CLI is not redistributed.
