@@ -1,5 +1,7 @@
 # Nexus AI Usage (Preview)
 
+**English** | [繁體中文（台灣）](README.zh-TW.md)
+
 A local quota monitor for Antigravity, Claude personal subscription quotas,
 Enterprise account spend, and Codex.
 Derived from [Quota Nexus](https://github.com/praveen2git/quota-nexus), with Claude
