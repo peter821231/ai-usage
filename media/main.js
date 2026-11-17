@@ -3,6 +3,8 @@
     const api = acquireVsCodeApi();
     const root = document.getElementById('root');
     let state;
+    let i18n;
+    const t = (key, args) => i18n.t(key, args);
     let showSettings = false;
     const stored = api.getState?.();
     const collapsed = new Set(
@@ -17,37 +19,22 @@
         if (text !== undefined) n.textContent = text;
         return n;
     };
-    const percent = (v) => (typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v * 10) / 10}%` : 'Unknown');
-    const money = (v, c) => (typeof v === 'number' && Number.isFinite(v) ? `${c || '?'} ${v.toFixed(2)}` : 'Unknown');
-    const stamp = (value) =>
-        value
-            ? new Date(value).toLocaleString('en-GB', {
-                  timeZone: state.timeZone || 'Asia/Taipei',
-                  dateStyle: 'medium',
-                  timeStyle: 'short'
-              })
-            : 'Unknown';
-    function countdown(row) {
-        if (!row.resetAt) return 'Unknown';
-        if (row.resetPending) return 'Pending';
-        const minutes = Math.max(1, Math.ceil((Date.parse(row.resetAt) - state.now) / 60000));
-        const days = Math.floor(minutes / 1440),
-            hours = Math.floor((minutes % 1440) / 60),
-            mins = minutes % 60;
-        return days ? `${days}d ${hours}h` : hours ? `${hours}h ${mins}m` : `${mins}m`;
-    }
+    const percent = (value) => i18n.percent(value);
+    const money = (value, currency) => i18n.money(value, currency);
+    const stamp = (value) => i18n.stamp(value, state.timeZone);
+    const countdown = (row) => i18n.duration(row.resetAt, state.now, row.resetPending);
     function resetText(row) {
-        if (!row.resetAt) return 'Unknown';
-        return `${stamp(row.resetAt)} · ${row.resetPending ? 'elapsed; awaiting new reading' : 'in ' + countdown(row)}${row.resetBasis === 'event-relative' ? ' · from event + interval' : ''}${row.resetBasis === 'official-monthly-rule' ? ' · official monthly rule (00:00 UTC)' : ''}`;
+        if (!row.resetAt) return t('common.unknown');
+        return `${stamp(row.resetAt)} · ${row.resetPending ? t('reset.elapsed') : t('reset.in', { duration: countdown(row) })}${row.resetBasis === 'event-relative' ? ' · ' + t('reset.fromEvent') : ''}${row.resetBasis === 'official-monthly-rule' ? ' · ' + t('reset.monthly') : ''}`;
     }
     function tokens(value) {
-        if (typeof value !== 'number' || !Number.isFinite(value)) return 'Unknown';
+        if (typeof value !== 'number' || !Number.isFinite(value)) return t('common.unknown');
         if (value >= 1e6) return `${(value / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
         if (value >= 1e3) return `${(value / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
         return String(value);
     }
     function creditCount(value) {
-        return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-US') : 'Unknown';
+        return typeof value === 'number' && Number.isFinite(value) ? i18n.number(value) : t('common.unknown');
     }
     function sourceTime(p) {
         return (
@@ -57,21 +44,11 @@
             null
         );
     }
-    function age(value) {
-        if (!value) return 'No reading';
-        const minutes = Math.max(0, Math.floor((state.now - value) / 60000));
-        return minutes < 1
-            ? 'just now'
-            : minutes < 60
-              ? `${minutes}m ago`
-              : minutes < 1440
-                ? `${Math.floor(minutes / 60)}h ago`
-                : `${Math.floor(minutes / 1440)}d ago`;
-    }
-    function button(label, action) {
+    const age = (value) => i18n.age(value, state.now);
+    function button(label, action, id) {
         const b = el('button', 'button', label);
         b.type = 'button';
-        if (label) b.dataset.focus = `action:${label}`;
+        if (id) b.dataset.focus = `action:${id}`;
         b.addEventListener('click', action);
         return b;
     }
@@ -91,7 +68,7 @@
             track.append(fill);
         } else {
             track.classList.add('unknown');
-            track.setAttribute('aria-valuetext', 'Unknown');
+            track.setAttribute('aria-valuetext', t('common.unknown'));
         }
         return track;
     }
@@ -101,18 +78,18 @@
         label.title = row.label;
         if (row.stale && !row.recordedOnly && row.usedPct !== null) {
             const warning = el('span', 'row-stale', ' ~');
-            warning.title = 'Stale: last observation retained';
-            warning.setAttribute('aria-label', 'Stale');
+            warning.title = t('source.staleHint');
+            warning.setAttribute('aria-label', t('source.stale'));
             label.append(warning);
         }
         const value = state.percentMode === 'left' ? row.remainingPct : row.usedPct;
         const valueText = el('strong', value === null ? 'value unknown-value' : 'value', percent(value));
         const reset = el('span', 'reset', countdown(row));
-        reset.title = `Reset: ${resetText(row)}`;
-        box.title = `${row.label}: ${percent(row.usedPct)} used · ${percent(row.remainingPct)} remaining. Reset: ${resetText(row)}`;
+        reset.title = t('reset.label', { reset: resetText(row) });
+        box.title = t('quota.reading', { window: row.label, used: percent(row.usedPct), remaining: percent(row.remainingPct), reset: resetText(row) });
         box.append(
             label,
-            meter(value, `${row.label}: ${percent(value)} ${state.percentMode === 'left' ? 'remaining' : 'used'}`),
+            meter(value, t('quota.meter', { window: row.label, value: percent(value), mode: t(state.percentMode === 'left' ? 'quota.remaining' : 'quota.used') })),
             valueText,
             reset
         );
@@ -121,30 +98,30 @@
     function spend(s) {
         const box = el('div', 'spend');
         const line = el('div', 'line spend-heading');
-        line.append(el('h3', '', s.title || 'Account budget'));
-        if (s.stale) line.append(badge('Stale', true));
-        if (s.enabled === false) line.append(badge('Spending disabled', true));
+        line.append(el('h3', '', s.title || t('budget.account')));
+        if (s.stale) line.append(badge(t('source.stale'), true));
+        if (s.enabled === false) line.append(badge(t('budget.disabled'), true));
         box.append(line);
         const big = el('div', 'money');
         big.append(el('strong', '', money(s.used, s.currency)), el('span', 'cap', ` / ${money(s.limit, s.currency)}`));
-        box.append(big, meter(s.usedPct, `Budget ${percent(s.usedPct)} used`));
+        box.append(big, meter(s.usedPct, t('budget.used', { value: percent(s.usedPct) })));
         const meta = el('div', 'spend-meta');
         meta.append(
-            el('span', 'muted', `${percent(s.usedPct)} used`),
+            el('span', 'muted', t('quota.usedValue', { value: percent(s.usedPct) })),
             el(
                 'span',
                 'remaining',
                 s.remaining !== null && s.remaining < 0
-                    ? `Over budget ${money(-s.remaining, s.currency)}`
-                    : `Remaining ${money(s.remaining, s.currency)}`
+                    ? t('budget.over', { amount: money(-s.remaining, s.currency) })
+                    : t('budget.remaining', { amount: money(s.remaining, s.currency) })
             )
         );
         const reset = el('div', 'budget-reset');
-        reset.append(el('span', 'muted', 'Resets in'), el('span', '', countdown(s)));
+        reset.append(el('span', 'muted', t('reset.inLabel')), el('span', '', countdown(s)));
         reset.title = resetText(s);
         box.append(meta, reset);
         if (s.resetBasis === 'official-monthly-rule')
-            box.append(el('div', 'detail reset-policy', 'Monthly · 1st at 00:00 UTC · official rule'));
+            box.append(el('div', 'detail reset-policy', t('budget.monthly')));
         if (s.issue) box.append(el('p', 'problem', s.issue));
         return box;
     }
@@ -153,7 +130,7 @@
         const known = typeof c.windowTokens === 'number' && typeof c.usedTokens === 'number';
         const heading = el('div', 'context-heading');
         heading.append(
-            el('h3', '', 'Context'),
+            el('h3', '', t('context.title')),
             el('span', 'context-model', c.model || ''),
             el(
                 'strong',
@@ -161,12 +138,12 @@
                 `${percent(c.pct)}${known ? ' · ' + tokens(c.usedTokens) + ' / ' + tokens(c.windowTokens) : ''}`
             )
         );
-        heading.title = 'Conversation context occupancy, separate from quota and budget';
-        section.append(heading, meter(c.pct, `Conversation context: ${percent(c.pct)} occupied`));
+        heading.title = t('context.hint');
+        section.append(heading, meter(c.pct, t('context.meter', { value: percent(c.pct) })));
         const meta = el('div', 'context-meta');
         meta.append(
-            el('span', '', c.windowExact ? 'Context window' : 'Estimated context'),
-            el('span', '', known ? `${tokens(Math.max(0, c.windowTokens - c.usedTokens))} left` : 'Unknown')
+            el('span', '', t(c.windowExact ? 'context.window' : 'context.estimated')),
+            el('span', '', known ? t('context.left', { tokens: tokens(Math.max(0, c.windowTokens - c.usedTokens)) }) : t('common.unknown'))
         );
         section.append(meta);
         return section;
@@ -174,7 +151,7 @@
     function sourceDetails(p) {
         const details = el('details', 'source-details');
         details.open = expandedDetails.has(p.id);
-        const summary = el('summary', '', 'Source & reset details');
+        const summary = el('summary', '', t('source.details'));
         summary.dataset.focus = `source:${p.id}`;
         details.append(summary);
         summary.addEventListener('click', (event) => {
@@ -188,7 +165,7 @@
             el(
                 'p',
                 'detail',
-                `${p.id === 'codex' ? 'Source event' : 'Fetched'}: ${stamp(sourceTime(p))} · ${state.timeZone || 'Asia/Taipei'}`
+                `${t(p.id === 'codex' ? 'source.event' : 'source.fetched')}: ${stamp(sourceTime(p))} · ${state.timeZone || 'Asia/Taipei'}`
             )
         );
         for (const g of p.groups)
@@ -196,12 +173,12 @@
                 const item = el('p', 'detail');
                 item.append(
                     el('strong', '', `${p.id === 'antigravity' ? g.label + ' · ' : ''}${r.label}: `),
-                    el('span', '', `reset ${resetText(r)} · source ${stamp(r.observedAt)}`)
+                    el('span', '', t('source.rowDetails', { reset: resetText(r), time: stamp(r.observedAt) }))
                 );
                 details.append(item);
             }
-        if (p.spend) details.append(el('p', 'detail', `Budget reset: ${resetText(p.spend)}`));
-        if (p.models?.length) details.append(el('p', 'detail models', `Models: ${p.models.join(', ')}`));
+        if (p.spend) details.append(el('p', 'detail', t('budget.reset', { reset: resetText(p.spend) })));
+        if (p.models?.length) details.append(el('p', 'detail models', t('source.models', { models: p.models.join(', ') })));
         return details;
     }
     function preview(p) {
@@ -213,14 +190,14 @@
                     'mini-money',
                     `${money(p.spend.used, p.spend.currency)} / ${money(p.spend.limit, p.spend.currency)}`
                 ),
-                meter(p.spend.usedPct, 'Budget used')
+                meter(p.spend.usedPct, t('budget.usedLabel'))
             );
         } else {
             const grid = el('div', 'mini-grid');
             for (const g of p.groups)
                 for (const r of g.rows) {
                     const item = el('div', 'mini-item');
-                    const label = `${p.id === 'antigravity' ? g.short + ' ' : ''}${r.label === 'Weekly' ? 'wk' : r.label === '5-hour' ? '5h' : r.label}`;
+                    const label = `${p.id === 'antigravity' ? g.short + ' ' : ''}${i18n.windowLabel(r, true)}`;
                     item.append(
                         el('span', 'muted', label),
                         el(
@@ -251,7 +228,7 @@
         toggle.dataset.focus = `collapse:${p.id}`;
         toggle.setAttribute('aria-expanded', String(!isCollapsed));
         toggle.setAttribute('aria-controls', `body-${p.id}`);
-        toggle.setAttribute('aria-label', `${isCollapsed ? 'Expand' : 'Collapse'} ${p.title}`);
+        toggle.setAttribute('aria-label', t(isCollapsed ? 'action.expand' : 'action.collapse', { provider: p.title }));
         toggle.append(el('span', 'provider-icon', { antigravity: 'AG', claude: 'CC', codex: 'CX' }[p.id]));
         const text = el('span', 'provider-label');
         text.append(el('span', 'provider-title', p.title));
@@ -266,7 +243,7 @@
             el(
                 'span',
                 '',
-                `${issue ? (hasData ? 'Needs attention' : 'Unavailable') : stale ? 'Stale' : recorded ? 'Last recorded' : hasData ? 'Active' : 'Waiting'} · ${age(sourceTime(p))}`
+                `${t(issue ? (hasData ? 'status.attention' : 'status.unavailable') : stale ? 'source.stale' : recorded ? 'source.lastRecorded' : hasData ? 'status.active' : 'status.waiting')} · ${age(sourceTime(p))}`
             )
         );
         text.append(status);
@@ -282,7 +259,7 @@
         const body = el('div', 'card-body');
         body.id = `body-${p.id}`;
         body.hidden = isCollapsed;
-        if (p.error) body.append(el('p', 'problem', `${p.error}. Last successful values, if any, are retained.`));
+        if (p.error) body.append(el('p', 'problem', t('error.retained', { error: p.error })));
         if (p.notice) body.append(el('p', 'problem', p.notice));
         if (p.spend && p.primaryMetric !== 'quota') body.append(spend(p.spend));
         let count = 0;
@@ -292,20 +269,20 @@
             const title = el('div', 'group-heading');
             title.append(el('h3', '', g.label));
             if (count === 0)
-                title.append(el('span', 'legend', `${state.percentMode === 'left' ? 'Left' : 'Used'} · Resets in`));
+                title.append(el('span', 'legend', t('quota.legend', { mode: t(state.percentMode === 'left' ? 'quota.left' : 'quota.used') })));
             group.append(title);
             g.rows.forEach((r) => group.append(quota(r)));
             body.append(group);
             count += g.rows.length;
         }
         if (p.spend && p.primaryMetric === 'quota') body.append(spend(p.spend));
-        if (!p.spend && !count) body.append(el('p', 'problem', 'Usage unknown. No valid reading yet.'));
+        if (!p.spend && !count) body.append(el('p', 'problem', t('quota.empty')));
         if (state.showContext && p.context) body.append(contextView(p.context));
         if (p.credits && Object.keys(p.credits).length) {
             const credits = el('div', 'credits');
             for (const [kind, label] of [
-                ['prompt', 'Prompt credits left'],
-                ['flow', 'Flow credits left']
+                ['prompt', t('credits.prompt')],
+                ['flow', t('credits.flow')]
             ])
                 if (p.credits[kind]) {
                     const line = el('div', 'credit-line');
@@ -329,11 +306,11 @@
     }
     function settings() {
         const panel = el('section', 'card settings');
-        panel.append(el('h2', '', 'Display & monitoring'));
+        panel.append(el('h2', '', t('settings.title')));
         for (const g of state.settings || []) {
             panel.append(el('h3', '', g.title));
-            if (g.title === 'Status Bar')
-                panel.append(el('p', 'detail status-bar-note', 'Status bar space is limited; only selected summaries are shown. Hover or open the dashboard for all limits.'));
+            if (g.id === 'statusBar')
+                panel.append(el('p', 'detail status-bar-note', t('settings.statusNote')));
             for (const item of g.items) {
                 const label = el('label', 'setting');
                 label.append(el('span', '', item.label));
@@ -360,6 +337,8 @@
                 );
                 label.append(input);
                 panel.append(label);
+                if (item.key === 'display.language')
+                    panel.append(el('p', 'detail language-note', t('settings.languageNote')));
             }
         }
         return panel;
@@ -375,27 +354,27 @@
             el(
                 'p',
                 'muted',
-                `${state.percentMode === 'left' ? 'Remaining' : 'Used'} · ${state.timeZone || 'Asia/Taipei'}`
+                `${t(state.percentMode === 'left' ? 'quota.remaining' : 'quota.used')} · ${state.timeZone || 'Asia/Taipei'}`
             )
         );
-        header.append(title, badge('PREVIEW'));
+        header.append(title, badge(t('dashboard.preview')));
         fragment.append(header);
         const actions = el('nav', 'actions');
-        actions.setAttribute('aria-label', 'Usage actions');
+        actions.setAttribute('aria-label', t('action.usage'));
         actions.append(
-            button('Refresh', () => api.postMessage({ type: 'refresh' })),
-            button('Settings', () => {
+            button(t('action.refresh'), () => api.postMessage({ type: 'refresh' }), 'refresh'),
+            button(t('action.settings'), () => {
                 showSettings = !showSettings;
                 render();
-            }),
-            button('Diagnostics', () => api.postMessage({ type: 'diagnostics' }))
+            }, 'settings'),
+            button(t('action.diagnostics'), () => api.postMessage({ type: 'diagnostics' }), 'diagnostics')
         );
         fragment.append(actions);
         if (showSettings) fragment.append(settings());
         for (const p of state.providers || []) fragment.append(provider(p));
         if (!state.providers?.length)
-            fragment.append(el('p', 'problem', 'All providers are disabled. Enable monitoring in Settings.'));
-        fragment.append(el('footer', 'muted', 'Unknown = no reading · ~ = stale. Values retain their source time.'));
+            fragment.append(el('p', 'problem', t('dashboard.noProviders')));
+        fragment.append(el('footer', 'muted', t('dashboard.footer')));
         root.replaceChildren(fragment);
         if (focus)
             [...root.querySelectorAll('[data-focus]')]
@@ -405,6 +384,8 @@
     window.addEventListener('message', (event) => {
         if (event.data?.type === 'state') {
             state = event.data.state;
+            i18n = NexusI18n.createTranslator(state.i18n);
+            document.documentElement.lang = i18n.locale;
             render();
         }
         if (event.data?.type === 'showSettings') {

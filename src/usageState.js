@@ -8,6 +8,40 @@ const EXPECTED = [
     ['Claude and GPT models', 'Claude/GPT', ['5-hour', 'Weekly']],
     ['Gemini 4 Argon', 'Argon', ['Weekly']]
 ];
+const GROUP_TYPES = {
+    'Gemini Models': 'gemini',
+    'Claude and GPT models': 'claudeGpt',
+    'Gemini 4 Argon': 'argon'
+};
+const WINDOW_TYPES = { '5-hour': 'fiveHour', Weekly: 'weekly', Daily: 'daily', Limit: 'limit' };
+// Canonical names come from the parsers; translated labels never enter matching.
+function windowIdentity(label) {
+    if (typeof label !== 'string') return { windowType: null, scope: '' };
+    const [name, ...scope] = label.split(' · ');
+    return { windowType: Object.hasOwn(WINDOW_TYPES, name) ? WINDOW_TYPES[name] : null, scope: scope.join(' · ') };
+}
+const ERROR_KEYS = {
+    'cli-unavailable': 'error.claude.cliUnavailable',
+    timeout: 'error.claude.timeout',
+    'cli-exited': 'error.claude.cliExited',
+    'request-refused': 'error.claude.refused',
+    'unsupported-payload': 'error.claude.unsupported',
+    'output-too-large': 'error.claude.outputTooLarge',
+    'query-failed': 'error.claude.failed',
+    'agy-summary-unavailable': 'error.agy.summary',
+    'agy-unavailable': 'error.agy.unavailable',
+    'codex-no-event': 'error.codex.noEvent',
+    'codex-read-failed': 'error.codex.read',
+    'cache-unavailable': 'error.cache',
+    // Compatibility with earlier in-memory errors and cached spend issues.
+    'Quota summary is unavailable': 'error.agy.summary',
+    'Quota summary request failed': 'error.agy.request',
+    'Quota summary contains no usable groups': 'error.agy.noGroups',
+    'Local Antigravity service is unavailable in this extension host': 'error.agy.unavailable',
+    'No Codex rate-limit event found in this extension host': 'error.codex.noEvent',
+    'Could not read local Codex rate-limit events': 'error.codex.read',
+    'Usage cache is unavailable in this extension host': 'error.cache'
+};
 
 function row(id, label, usedPct, resetAt, snapshot, ttl, now) {
     const known = finite(usedPct) && usedPct >= 0;
@@ -23,6 +57,7 @@ function row(id, label, usedPct, resetAt, snapshot, ttl, now) {
     return {
         id,
         label,
+        ...windowIdentity(label),
         usedPct: known ? usedPct : null,
         remainingPct: known ? Math.max(0, 100 - usedPct) : null,
         resetAt: reset,
@@ -50,6 +85,7 @@ function antigravityView(snapshot = {}, now = Date.now()) {
             result.push({
                 id: g.id,
                 label: g.name,
+                groupType: GROUP_TYPES[name],
                 short,
                 rows: all.map((w) => ({
                     ...row(
@@ -94,6 +130,7 @@ function antigravityView(snapshot = {}, now = Date.now()) {
         models: snapshot.data?.models || [],
         groups: result,
         error: snapshot.error || '',
+        errorKey: ERROR_KEYS[snapshot.error],
         plan: snapshot.data?.plan || '',
         context: snapshot.context || null,
         enabled: snapshot.enabled !== false
@@ -116,6 +153,7 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
         {
             id: 'claude-windows',
             label: 'Time-window quotas',
+            groupType: 'timeWindows',
             short: 'Claude',
             rows: windows.map((w) => ({
                 ...row(w.id, w.name, w.usedPct, w.resetAt, timing, 10 * 60000, now),
@@ -132,6 +170,8 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
                   data.plan !== 'enterprise' && data.spend.format === 'extra_usage'
                       ? 'Extra usage budget'
                       : 'Account budget',
+              titleKey: data.plan !== 'enterprise' && data.spend.format === 'extra_usage' ? 'budget.extra' : 'budget.account',
+              issueKey: data.spend.issue ? (data.spend.format === 'extra_usage' ? 'error.money.legacy' : 'error.money.invalid') : null,
               observedAt: timing.observedAt,
               resetPending: !!(reset.resetAt && Date.parse(reset.resetAt) <= now),
               stale:
@@ -160,7 +200,9 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
         plan: data?.plan || '',
         observedAt: timing.observedAt,
         error: errors[snapshot.error] || snapshot.error || '',
+        errorKey: ERROR_KEYS[snapshot.error],
         notice: data?.available === false ? 'Usage is unavailable for this sign-in method' : '',
+        noticeKey: data?.available === false ? 'source.signInUnavailable' : null,
         context: snapshot.context || null,
         enabled: snapshot.enabled !== false
     };
@@ -180,6 +222,7 @@ function codexView(snapshot = {}, now = Date.now()) {
             {
                 id: 'codex',
                 label: 'Time-window quotas',
+                groupType: 'timeWindows',
                 short: 'Codex',
                 rows: windows.map((w) => {
                     const reading = row(w.name, w.name, w.pct, w.resetsAt, timing, 5 * 60000, now);
@@ -194,6 +237,7 @@ function codexView(snapshot = {}, now = Date.now()) {
         ],
         plan: limits?.plan || '',
         error: snapshot.error || '',
+        errorKey: ERROR_KEYS[snapshot.error],
         context: snapshot.data?.context || null,
         enabled: snapshot.enabled !== false
     };

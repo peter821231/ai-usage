@@ -14,6 +14,7 @@ const { buildUsageState } = require('./usageState');
 const { StatusBar, AG_STATUS_WINDOWS } = require('./statusBar');
 const { DashboardProvider } = require('./webview');
 const { settingsView, isValidSetting } = require('./settingsUi');
+const { createI18n, localizeView } = require('./i18n');
 
 class Monitor {
     constructor(context) {
@@ -46,9 +47,12 @@ class Monitor {
             ),
             vscode.workspace.onDidChangeConfiguration((e) => {
                 if (!e.affectsConfiguration(cfg.SECTION)) return;
-                this.schedule();
+                if (e.affectsConfiguration(`${cfg.SECTION}.refresh`)) this.schedule();
                 this.render();
-                void this.refresh();
+                const sourceSettings = ['refresh', 'antigravity.enable', 'claudeCode.enable',
+                    'claudeCode.timeoutSeconds', 'codex.enable', 'context.show', 'claudeCode.enterpriseResetSchedule'];
+                if (sourceSettings.some((key) => e.affectsConfiguration(`${cfg.SECTION}.${key}`)))
+                    void this.refresh();
             }),
             vscode.window.onDidChangeWindowState((s) => {
                 if (s.focused) void this.refresh();
@@ -103,12 +107,12 @@ class Monitor {
                 };
                 s.observedAt = this.agy.limitsFetchedAt;
             }
-            s.error = this.agy.limitsError || (groups ? '' : 'Quota summary is unavailable');
+            s.error = this.agy.limitsError || (groups ? '' : 'agy-summary-unavailable');
             s.context = cfg.get('context.show', false)
                 ? await this.agy.getContext(this.paths(), status.modelLabels).catch(() => null)
                 : null;
         } catch {
-            s.error = 'Local Antigravity service is unavailable in this extension host';
+            s.error = 'agy-unavailable';
         }
         s.checkedAt = Date.now();
         this.render();
@@ -121,9 +125,9 @@ class Monitor {
             if (data?.limits) {
                 s.data = data;
                 s.error = '';
-            } else s.error = 'No Codex rate-limit event found in this extension host';
+            } else s.error = 'codex-no-event';
         } catch {
-            s.error = 'Could not read local Codex rate-limit events';
+            s.error = 'codex-read-failed';
         }
         s.checkedAt = Date.now();
         this.render();
@@ -160,7 +164,7 @@ class Monitor {
                 ? await this.claudeContext.read(this.paths()).catch(() => null)
                 : null;
         } catch {
-            s.error = 'Usage cache is unavailable in this extension host';
+            s.error = 'cache-unavailable';
         }
         this.render();
     }
@@ -178,10 +182,11 @@ class Monitor {
         ]) {
             input[id] = { ...input[id], enabled: cfg.get(`${key}.enable`, true) };
         }
-        const view = buildUsageState(input);
+        const i18n = createI18n(cfg.get('display.language', 'auto'), vscode.env.language);
+        const view = localizeView(buildUsageState(input), i18n);
         view.showContext = cfg.get('context.show', false);
         view.timeZone = cfg.timeZone();
-        view.settings = settingsView((k) => cfg.get(k));
+        view.settings = settingsView((k) => cfg.get(k), i18n);
         this.bar.update(view, {
             show: cfg.get('statusBar.show', true),
             antigravityWindows: Object.fromEntries(

@@ -1,5 +1,22 @@
 # Nexus AI Usage changelog
 
+## 0.1.8 — 2026-11-17 (Preview)
+
+- Review Taiwan Traditional Chinese against the pinned Taiwan.md terminology
+  snapshot; align reset, template, view and conversation-context wording.
+- Clarify that internal Antigravity Prompt/Flow credit fields have unverified
+  semantics. No credit parsing, quota calculations or rendering behavior changes.
+
+## 0.1.7 — 2026-11-17 (Preview)
+
+- Add independently selectable English and Taiwan Traditional Chinese for the
+  dashboard, quick settings, status bar, hover and accessibility labels. Follow
+  the editor by default; keep native contributions tied to editor language.
+- Preserve source identities, values, timestamps, selected windows and UI focus
+  when switching language, without issuing provider queries.
+- Add single-file JSON translation catalogs, a template generator, placeholder
+  validation and generated native manifest translations. No runtime dependencies.
+
 ## 0.1.6 — 2026-11-17 (Preview)
 
 - Default Antigravity's status summary to Gemini Models 5-hour / Weekly and

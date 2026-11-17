@@ -1,8 +1,8 @@
 {
   "name": "nexus-ai-usage",
-  "displayName": "Nexus AI Usage (Preview)",
-  "description": "Local AI quota monitor for Antigravity, Claude Pro/Max quotas, Enterprise spend and Codex. Independent preview derived from Quota Nexus.",
-  "version": "0.1.6",
+  "displayName": "%manifest.displayName%",
+  "description": "%manifest.description%",
+  "version": "0.1.8",
   "publisher": "nexus-ai-usage-local",
   "license": "MIT",
   "repository": {
@@ -77,7 +77,7 @@
         {
           "type": "webview",
           "id": "nexusAiUsage.dashboard",
-          "name": "Dashboard",
+          "name": "%manifest.view.dashboard%",
           "icon": "assets/icon.svg"
         }
       ]
@@ -85,31 +85,31 @@
     "commands": [
       {
         "command": "nexusAiUsage.refresh",
-        "title": "Refresh Usage",
+        "title": "%manifest.command.refresh%",
         "category": "Nexus AI Usage",
         "icon": "$(refresh)"
       },
       {
         "command": "nexusAiUsage.showDiagnostics",
-        "title": "Show Diagnostics",
+        "title": "%manifest.command.showDiagnostics%",
         "category": "Nexus AI Usage",
         "icon": "$(pulse)"
       },
       {
         "command": "nexusAiUsage.quickSettings",
-        "title": "Quick Settings",
+        "title": "%manifest.command.quickSettings%",
         "category": "Nexus AI Usage",
         "icon": "$(settings-gear)"
       },
       {
         "command": "nexusAiUsage.openSettings",
-        "title": "Open Settings",
+        "title": "%manifest.command.openSettings%",
         "category": "Nexus AI Usage",
         "icon": "$(gear)"
       },
       {
         "command": "nexusAiUsage.togglePercentMode",
-        "title": "Toggle Used / Remaining",
+        "title": "%manifest.command.togglePercentMode%",
         "category": "Nexus AI Usage",
         "icon": "$(arrow-both)"
       }
@@ -140,27 +140,27 @@
     },
     "configuration": [
       {
-        "title": "General",
+        "title": "%manifest.group.0%",
         "order": 1,
         "properties": {
           "nexusAiUsage.display.percentMode": {
             "type": "string",
             "default": "used",
-            "description": "Display quota as used or remaining.",
+            "description": "%manifest.setting.display.percentMode.description%",
             "order": 1,
             "enum": [
               "used",
               "left"
             ],
             "enumItemLabels": [
-              "Used",
-              "Remaining"
+              "%manifest.setting.display.percentMode.option.0%",
+              "%manifest.setting.display.percentMode.option.1%"
             ]
           },
           "nexusAiUsage.refresh.activeInterval": {
             "type": "number",
             "default": 60000,
-            "description": "How often to check sources. Claude queries are cached for five minutes.",
+            "description": "%manifest.setting.refresh.activeInterval.description%",
             "order": 2,
             "enum": [
               30000,
@@ -169,44 +169,61 @@
               300000
             ],
             "enumItemLabels": [
-              "30 seconds",
-              "1 minute",
-              "2 minutes",
-              "5 minutes"
+              "%manifest.setting.refresh.activeInterval.option.0%",
+              "%manifest.setting.refresh.activeInterval.option.1%",
+              "%manifest.setting.refresh.activeInterval.option.2%",
+              "%manifest.setting.refresh.activeInterval.option.3%"
             ]
           },
           "nexusAiUsage.refresh.pauseWhenUnfocused": {
             "type": "boolean",
             "default": true,
-            "description": "Pause polling when the editor is in the background.",
+            "description": "%manifest.setting.refresh.pauseWhenUnfocused.description%",
             "order": 3
           },
           "nexusAiUsage.context.show": {
             "type": "boolean",
             "default": false,
-            "description": "Show conversation context in a separate details section.",
+            "description": "%manifest.setting.context.show.description%",
             "order": 4
           },
           "nexusAiUsage.display.timeZone": {
             "type": "string",
             "default": "Asia/Taipei",
-            "description": "Timezone for absolute reset and source timestamps.",
+            "description": "%manifest.setting.display.timeZone.description%",
             "order": 5,
             "enum": [
               "Asia/Taipei",
               "UTC"
             ]
+          },
+          "nexusAiUsage.display.language": {
+            "type": "string",
+            "default": "auto",
+            "scope": "window",
+            "description": "%manifest.setting.display.language.description%",
+            "order": 0,
+            "enum": [
+              "auto",
+              "en",
+              "zh-TW"
+            ],
+            "enumItemLabels": [
+              "%manifest.setting.display.language.option.0%",
+              "English",
+              "繁體中文（台灣）"
+            ]
           }
         }
       },
       {
-        "title": "Status Bar",
+        "title": "%manifest.group.1%",
         "order": 2,
         "properties": {
           "nexusAiUsage.statusBar.show": {
             "type": "boolean",
             "default": true,
-            "description": "Show selected usage summaries. Status bar width is limited and shared with other items; hover or open the dashboard for all monitored limits.",
+            "description": "%manifest.setting.statusBar.show.description%",
             "order": 1
           }
         }
@@ -218,43 +235,43 @@
           "nexusAiUsage.antigravity.enable": {
             "type": "boolean",
             "default": true,
-            "description": "Monitor this provider in this extension host.",
+            "description": "%manifest.setting.antigravity.enable.description%",
             "order": 1
           },
           "nexusAiUsage.antigravity.showInStatusBar": {
             "type": "boolean",
             "default": true,
-            "description": "Include this provider in the status bar.",
+            "description": "%manifest.setting.antigravity.showInStatusBar.description%",
             "order": 2
           },
           "nexusAiUsage.antigravity.statusBar.geminiFiveHour": {
             "type": "boolean",
             "default": true,
-            "description": "Show Gemini Models 5-hour in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+            "description": "%manifest.setting.antigravity.statusBar.geminiFiveHour.description%",
             "order": 3
           },
           "nexusAiUsage.antigravity.statusBar.geminiWeekly": {
             "type": "boolean",
             "default": true,
-            "description": "Show Gemini Models weekly in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+            "description": "%manifest.setting.antigravity.statusBar.geminiWeekly.description%",
             "order": 4
           },
           "nexusAiUsage.antigravity.statusBar.claudeGptFiveHour": {
             "type": "boolean",
             "default": false,
-            "description": "Show Claude and GPT models 5-hour in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+            "description": "%manifest.setting.antigravity.statusBar.claudeGptFiveHour.description%",
             "order": 5
           },
           "nexusAiUsage.antigravity.statusBar.claudeGptWeekly": {
             "type": "boolean",
             "default": false,
-            "description": "Show Claude and GPT models weekly in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+            "description": "%manifest.setting.antigravity.statusBar.claudeGptWeekly.description%",
             "order": 6
           },
           "nexusAiUsage.antigravity.statusBar.argonWeekly": {
             "type": "boolean",
             "default": true,
-            "description": "Show Gemini 4 Argon weekly in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+            "description": "%manifest.setting.antigravity.statusBar.argonWeekly.description%",
             "order": 7
           }
         }
@@ -266,19 +283,19 @@
           "nexusAiUsage.claudeCode.enable": {
             "type": "boolean",
             "default": true,
-            "description": "Monitor this provider in this extension host.",
+            "description": "%manifest.setting.claudeCode.enable.description%",
             "order": 1
           },
           "nexusAiUsage.claudeCode.showInStatusBar": {
             "type": "boolean",
             "default": true,
-            "description": "Include this provider in the status bar.",
+            "description": "%manifest.setting.claudeCode.showInStatusBar.description%",
             "order": 2
           },
           "nexusAiUsage.claudeCode.timeoutSeconds": {
             "type": "number",
             "default": 45,
-            "description": "Maximum time for the official CLI usage query.",
+            "description": "%manifest.setting.claudeCode.timeoutSeconds.description%",
             "order": 3,
             "enum": [
               15,
@@ -295,10 +312,10 @@
               "unknown"
             ],
             "enumItemLabels": [
-              "Monthly \u00b7 00:00 UTC",
-              "Source only / Unknown"
+              "%manifest.setting.claudeCode.enterpriseResetSchedule.option.0%",
+              "%manifest.setting.claudeCode.enterpriseResetSchedule.option.1%"
             ],
-            "description": "Enterprise spend only: when no source reset is available, use the official monthly rule confirmed against your Usage page. Select Source only if your plan uses a different period. The UI labels rule-derived times.",
+            "description": "%manifest.setting.claudeCode.enterpriseResetSchedule.description%",
             "order": 4
           }
         }
@@ -310,13 +327,13 @@
           "nexusAiUsage.codex.enable": {
             "type": "boolean",
             "default": true,
-            "description": "Monitor this provider in this extension host.",
+            "description": "%manifest.setting.codex.enable.description%",
             "order": 1
           },
           "nexusAiUsage.codex.showInStatusBar": {
             "type": "boolean",
             "default": true,
-            "description": "Include this provider in the status bar.",
+            "description": "%manifest.setting.codex.showInStatusBar.description%",
             "order": 2
           }
         }
@@ -327,7 +344,10 @@
     "check": "node scripts/check.cjs",
     "test": "node --test test/*.test.js",
     "test:ui": "node scripts/check-webview.cjs",
-    "package": "node scripts/package.cjs"
+    "package": "node scripts/package.cjs",
+    "locales:check": "node scripts/locales.cjs check",
+    "locales:build": "node scripts/locales.cjs build",
+    "locales:new": "node scripts/locales.cjs new"
   },
   "devDependencies": {
     "@vscode/vsce": "4.0.0",

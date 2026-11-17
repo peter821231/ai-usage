@@ -14,6 +14,7 @@ body {
     font-family: var(--vscode-font-family, system-ui, sans-serif);
     font-size: var(--vscode-font-size, 13px);
     line-height: 1.5;
+    overflow-wrap: anywhere;
 }
 #root {
     max-width: 780px;
@@ -73,10 +74,13 @@ header {
 }
 .actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 6px;
     margin-bottom: 8px;
 }
 .button {
+    max-width: 100%;
+    overflow-wrap: anywhere;
     font: inherit;
     font-size: 11px;
     cursor: pointer;
@@ -235,6 +239,7 @@ summary:focus-visible {
 }
 .group-heading {
     display: flex;
+    flex-wrap: wrap;
     align-items: baseline;
     justify-content: space-between;
     gap: 8px;
@@ -244,7 +249,7 @@ summary:focus-visible {
     min-width: 0;
 }
 .legend {
-    white-space: nowrap;
+    overflow-wrap: anywhere;
 }
 .quota {
     display: grid;
@@ -454,9 +459,14 @@ summary:focus-visible {
 .setting input {
     accent-color: var(--vscode-focusBorder);
 }
+.setting > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
 select {
     font: inherit;
     max-width: 155px;
+    min-width: 0;
     color: var(--vscode-dropdown-foreground);
     background: var(--vscode-dropdown-background);
     border: 1px solid var(--vscode-dropdown-border, transparent);

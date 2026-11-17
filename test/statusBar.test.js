@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const Module = require('node:module');
 const { buildUsageState } = require('../src/usageState');
 const { parseUsage } = require('../src/claudeUsage');
+const { createI18n, localizeView } = require('../src/i18n');
 const { personalUsage, extraUsage } = require('./fixtures/personal-claude.cjs');
 function load() {
     const items = [];
@@ -130,6 +131,24 @@ test('Antigravity selections change only the summary; all windows remain in hove
     assert.equal(items[0].visible, false);
 });
 
+test('Chinese status summaries use stable identities and retain every quota in the hover', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = localizeView(view(), createI18n('zh-TW'));
+    bar.update(v, { antigravityWindows: { geminiFiveHour: false, geminiWeekly: false, argonWeekly: true } });
+    assert.match(items[0].text, /AG Argon 週 10%/);
+    assert.doesNotMatch(items[0].text, /Gemini/);
+    assert.match(items[0].text, /Codex 5時 0% · 週 20%/);
+    assert.match(items[0].tooltip.value, /Gemini 模型/);
+    assert.match(items[0].tooltip.value, /Gemini 4 Argon/);
+    assert.match(items[0].tooltip.value, /未知/);
+    assert.match(items[0].tooltip.value, /已使用預算/);
+    assert.match(items[0].tooltip.value, /\[開啟完整資訊\]\(command:nexusAiUsage.dashboard.focus\)/);
+    v.providers[0].groups[0].label = '[unsafe](command:evil)';
+    bar.update(v);
+    assert.doesNotMatch(items[0].tooltip.value, /\[unsafe\]\(command:evil\)/);
+});
+
 test('unselected Antigravity windows do not color the selected summary', () => {
     const { StatusBar, items } = load();
     const bar = new StatusBar();
@@ -186,7 +205,7 @@ test('hover usage charts distinguish unknown from real zero and keep spend indep
     const v = view();
     v.providers[1].context = { pct: 68 };
     const text = hover(v).value;
-    assert.match(text, /17\.6% budget used/);
+    assert.match(text, /17\\?\.6% budget used/);
     assert.doesNotMatch(text, /68% budget/);
 });
 test('unknown, stale, errors and used/remaining semantics are explicit', () => {

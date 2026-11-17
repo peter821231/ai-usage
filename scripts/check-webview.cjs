@@ -5,7 +5,10 @@ const path = require('node:path');
 const http = require('node:http');
 const Module = require('node:module');
 const root = path.resolve(__dirname, '..');
-const { buildUsageState } = require(root + '/src/usageState');
+const { buildUsageState: buildRawUsageState } = require(root + '/src/usageState');
+const { createI18n, localizeView } = require(root + '/src/i18n');
+const buildUsageState = (input, now) => localizeView(buildRawUsageState(input, now), createI18n('en'));
+require('./locales.cjs').check();
 const { settingsView } = require(root + '/src/settingsUi');
 const { parseUsage } = require(root + '/src/claudeUsage');
 const { personalUsage, extraUsage } = require(root + '/test/fixtures/personal-claude.cjs');
@@ -138,7 +141,7 @@ const server = http.createServer((req, res) => {
                 { fsPath: root + '/media' }
             )
         );
-    } else if (['/media/main.css', '/media/main.js'].includes(req.url)) {
+    } else if (['/media/main.css', '/media/main.js', '/media/i18n.js'].includes(req.url)) {
         res.setHeader('Content-Type', req.url.endsWith('css') ? 'text/css' : 'application/javascript');
         res.end(fs.readFileSync(root + req.url));
     } else {
@@ -412,6 +415,69 @@ const server = http.createServer((req, res) => {
     );
     if (!(await page.locator('body').innerText()).includes('Unknown')) throw Error('Missing data hidden');
     if (await page.locator('.quota .meter .fill').count()) throw Error('Unknown readings rendered as zero bars');
+
+    // Drive the same setting message and state update used by an English editor.
+    const sendState = (value) => page.evaluate(
+        (s) => window.dispatchEvent(new MessageEvent('message', { data: { type: 'state', state: s } })), value
+    );
+    await sendState(state);
+    await page.getByRole('button', { name: 'Settings', exact: true }).click();
+    await page.locator('[data-provider="antigravity"] .source-details summary').click();
+    await page.getByRole('button', { name: 'Collapse Codex', exact: true }).click();
+    const languageSelect = page.locator('select[data-focus="setting:display.language"]');
+    const refreshCount = await page.evaluate(() => window.__messages.filter((m) => m.type === 'refresh').length);
+    await languageSelect.focus();
+    await languageSelect.selectOption(JSON.stringify('zh-TW'));
+    if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'display.language' && m.value === 'zh-TW'))))
+        throw Error('Language selection is not wired');
+    const chineseI18n = createI18n('zh-TW', 'en');
+    const chinese = localizeView(state, chineseI18n);
+    chinese.settings = settingsView((key) => key === 'display.language' ? 'zh-TW' : undefined, chineseI18n);
+    await sendState(chinese);
+    if ((await page.locator('html').getAttribute('lang')) !== 'zh-TW') throw Error('Document language did not change');
+    if (!(await page.getByRole('button', { name: '重新整理', exact: true }).isVisible())) throw Error('Chinese actions missing');
+    if (!(await page.locator('.language-note').textContent()).includes('編輯器原生設定頁')) throw Error('Language scope explanation missing');
+    if (!(await languageSelect.evaluate((node) => node === document.activeElement))) throw Error('Language switch lost focus');
+    if (!(await page.getByRole('button', { name: '展開 Codex', exact: true }).isVisible())) throw Error('Language switch lost collapse state');
+    if (!(await page.locator('[data-provider="antigravity"] .source-details').evaluate((node) => node.open))) throw Error('Language switch lost source details');
+    if ((await page.locator('.money').textContent()) !== 'USD 35.14 / USD 200.00') throw Error('Language switch changed money');
+    if (!(await page.locator('.budget-reset').getAttribute('title')).includes('08:00')) throw Error('Language switch changed timezone');
+    if ((await page.locator('.quota .meter').first().getAttribute('aria-valuenow')) !== '1') throw Error('Language switch changed quota');
+    if ((await page.evaluate(() => window.__messages.filter((m) => m.type === 'refresh').length)) !== refreshCount) throw Error('Language switch requested a refresh');
+    if (/%manifest\.|action\.refresh|common\.unknown/.test(await page.locator('body').innerText())) throw Error('Unresolved translation key');
+    for (const width of [280, 360, 900]) {
+        await page.setViewportSize({ width, height: 1000 });
+        if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Chinese settings overflow ' + width);
+    }
+    await page.setViewportSize({ width: 390, height: 1100 });
+    await captureDemo('dashboard-demo-zh-TW-settings');
+    await page.getByRole('button', { name: '設定', exact: true }).click();
+    await page.getByRole('button', { name: '展開 Codex', exact: true }).click();
+    await page.locator('[data-provider="antigravity"] .source-details summary').click();
+    for (const width of [280, 360, 900]) {
+        await page.setViewportSize({ width, height: 1000 });
+        if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Chinese dashboard overflow ' + width);
+    }
+    await page.setViewportSize({ width: 390, height: 1100 });
+    await captureDemo('dashboard-demo-zh-TW');
+    const chineseLeft = structuredClone(chinese);
+    chineseLeft.percentMode = 'left';
+    await sendState(chineseLeft);
+    if ((await page.locator('.quota .meter').first().getAttribute('aria-valuenow')) !== '99') throw Error('Chinese remaining mode lost semantics');
+    await sendState(localizeView(empty, chineseI18n));
+    if (!(await page.locator('body').innerText()).includes('未知')) throw Error('Chinese missing readings hidden');
+    if (await page.locator('.quota .meter .fill').count()) throw Error('Chinese unknown readings rendered as zero');
+    const longTranslation = structuredClone(chinese);
+    longTranslation.i18n.messages['action.refresh'] = 'VeryLongTranslatedRefreshLabel'.repeat(6);
+    longTranslation.i18n.messages['quota.used'] = 'VeryLongTranslatedPercentageLabel'.repeat(6);
+    longTranslation.providers[0].groups[0].label = '<img src=x onerror=alert(1)>';
+    await sendState(longTranslation);
+    await page.setViewportSize({ width: 280, height: 1000 });
+    if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw Error('Long translation overflow');
+    if (await page.locator('img').count()) throw Error('Localized text interpreted as HTML');
+    await sendState(state);
+    if ((await page.locator('html').getAttribute('lang')) !== 'en') throw Error('Could not return to English');
+    if (!(await page.getByRole('button', { name: 'Refresh', exact: true }).isVisible())) throw Error('English actions not restored');
     if (errors.length) throw Error(errors.join(';'));
     fs.writeFileSync(root + '/artifacts/dashboard-layout-metrics.json', JSON.stringify(layouts, null, 2) + '\n');
     console.log(
@@ -427,6 +493,9 @@ const server = http.createServer((req, res) => {
             personalExtraUsage: ['absent', 'supported', 'unsupported'],
             statusBarWindowChoices: 5,
             codexRecordedDataNeutral: true,
+            languages: ['en', 'zh-TW'],
+            languageSwitchPreservesFocusAndDetails: true,
+            longTranslations: true,
             pageErrors: errors,
             demoScreenshots: true
         })

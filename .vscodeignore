@@ -1,6 +1,13 @@
 # Package only the reviewed runtime and notices; local additions stay excluded.
 **
 !package.json
+!package.nls*.json
+!locales/index.json
+!locales/README.md
+!locales/??.json
+!locales/??-*.json
+!locales/???.json
+!locales/???-*.json
 !README.md
 !README.zh-TW.md
 !CHANGELOG.md
@@ -10,6 +17,7 @@
 !assets/icon.png
 !assets/icon.svg
 !media/main.js
+!media/i18n.js
 !media/main.css
 !src/*.js
 !docs/images/v0.1.6-status-bar.png

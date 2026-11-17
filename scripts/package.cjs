@@ -2,6 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+require('./locales.cjs').build();
 const pkg = require('../package.json');
 fs.mkdirSync(path.join(__dirname, '../artifacts'), { recursive: true });
 const vsce = require.resolve('@vscode/vsce/vsce');
