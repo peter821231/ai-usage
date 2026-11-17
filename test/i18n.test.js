@@ -54,6 +54,19 @@ test('named variables preserve literal values and allow translation to reorder t
     assert.equal(i18n.t('budget.remaining', { amount: hostile }), '剩餘 ' + hostile);
 });
 
+test('message keys are dictionary data, including names of Object prototype properties', () => {
+    const messages = JSON.parse('{"__proto__":"literal prototype key","constructor":"literal constructor key","toString":"literal string key","quota.used":"Used"}');
+    const i18n = createTranslator({ locale: 'en', messages });
+    assert.equal(i18n.t('__proto__'), 'literal prototype key');
+    assert.equal(i18n.t('constructor'), 'literal constructor key');
+    assert.equal(i18n.t('toString'), 'literal string key');
+    assert.equal(i18n.t('quota.used'), 'Used');
+    assert.equal(Object.getPrototypeOf(i18n.bundle.messages), Object.prototype);
+    assert.equal(Object.hasOwn(i18n.bundle.messages, '__proto__'), true);
+    assert.throws(() => i18n.t('hasOwnProperty'), /Missing translation/);
+    assert.equal(Object.getPrototypeOf(messages), Object.prototype);
+});
+
 test('formatting preserves zero, unknown, over-budget money and the chosen timezone', () => {
     const i18n = createI18n('zh-TW');
     assert.equal(i18n.percent(0), '0%');
@@ -220,6 +233,13 @@ test('contributors can generate a template and ship another locale using only tr
         assert.ok(fs.existsSync(path.join(scratch, 'package.nls.fr.json')));
         const checked = command('check');
         assert.equal(checked.status, 0, checked.stderr);
+        // Windows checkouts may use CRLF; line endings must not report stale data.
+        for (const name of ['package.json', 'locales/index.json', 'package.nls.json', 'package.nls.zh-tw.json', 'package.nls.fr.json', 'package.nls.de.json']) {
+            const target = path.join(scratch, name);
+            fs.writeFileSync(target, fs.readFileSync(target, 'utf8').replace(/\r?\n/g, '\r\n'));
+        }
+        const crlfChecked = command('check');
+        assert.equal(crlfChecked.status, 0, crlfChecked.stderr);
         // Run the real suite after adding data. Exclude this workflow to avoid recursion.
         const suite = fs.readdirSync(path.join(scratch, 'test'))
             .filter((name) => name.endsWith('.test.js')).map((name) => path.join('test', name));

@@ -7,12 +7,12 @@
 })(typeof globalThis === 'object' ? globalThis : this, function () {
     function createTranslator(bundle, fallbackMessages = {}) {
         const locale = bundle.locale;
-        const messages = { ...fallbackMessages };
+        const messages = new Map(Object.entries(fallbackMessages));
         for (const [key, value] of Object.entries(bundle.messages))
-            if (typeof value === 'string' && value.trim()) messages[key] = value;
+            if (typeof value === 'string' && value.trim()) messages.set(key, value);
         const formatLocale = locale === 'en' ? 'en-GB' : locale;
         const t = (key, args = {}) => {
-            const message = messages[key];
+            const message = messages.get(key);
             if (typeof message !== 'string' || !message.trim()) throw new Error(`Missing translation: ${key}`);
             return message.replace(/\{(\w+)\}/g, (match, name) =>
                 Object.hasOwn(args, name) ? String(args[name]) : match
@@ -56,7 +56,7 @@
             const scope = row.scope === 'OAuth apps' ? t('scope.oauthApps') : row.scope;
             return scope ? t('window.scoped', { window: name, scope }) : name;
         }
-        return { locale, t, unknown, number, percent, money, stamp, duration, age, windowLabel, bundle: { locale, messages } };
+        return { locale, t, unknown, number, percent, money, stamp, duration, age, windowLabel, bundle: { locale, messages: Object.fromEntries(messages) } };
     }
     return { createTranslator };
 });

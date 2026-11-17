@@ -97,7 +97,7 @@ function generatedFiles() {
 
 function check() {
     for (const [file, expected] of generatedFiles())
-        if (!fs.existsSync(path.join(root, file)) || fs.readFileSync(path.join(root, file), 'utf8') !== expected)
+        if (!fs.existsSync(path.join(root, file)) || fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n/g, '\n') !== expected)
             throw new Error(`${file} is out of date; run npm run locales:build`);
     console.log('Locale catalogs and generated manifest translations verified');
 }

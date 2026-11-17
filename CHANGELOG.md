@@ -1,5 +1,11 @@
 # Nexus AI Usage changelog
 
+## 0.1.10 — 2026-11-17 (Preview)
+
+- Store translations in a Map to avoid dynamic property writes flagged by CodeQL.
+- Normalize CRLF when checking generated locale files so Windows checkouts pass
+  the same consistency check as Linux and macOS. Add regression coverage for both.
+
 ## 0.1.9 — 2026-11-17 (Preview)
 
 - Derive language-selection test expectations from the registered catalogs so
