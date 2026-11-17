@@ -54,7 +54,7 @@ only the summary, not provider polling or the full dashboard.
 
 </details>
 
-See [preview provenance and UI highlights](docs/ui-previews.md) for image sources,
+See [preview provenance and UI highlights](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md) for image sources,
 the changes illustrated and instructions to regenerate the synthetic settings view.
 
 ## Features
