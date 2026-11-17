@@ -172,5 +172,6 @@
   "manifest.setting.codex.showInStatusBar.description": "Native editor command/settings contribution; follows editor language, not the extension override.",
   "error.agy.request": "Known Antigravity quota-summary error. Retain any previous successful observation.",
   "error.agy.noGroups": "Known Antigravity quota-summary error. Retain any previous successful observation.",
-  "scope.oauthApps": "Known legacy OAuth-application quota scope. Preserve OAuth as a protocol name."
+  "scope.oauthApps": "Known legacy OAuth-application quota scope. Preserve OAuth as a protocol name.",
+  "context.unknownModel": "Application fallback for a missing or placeholder model in conversation context. Real provider model names must remain unchanged."
 }

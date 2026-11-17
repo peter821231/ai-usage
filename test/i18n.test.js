@@ -8,19 +8,31 @@ const { spawnSync } = require('node:child_process');
 const { createI18n, resolveLocale, localizeView } = require('../src/i18n');
 const { createTranslator } = require('../media/i18n');
 const { buildUsageState } = require('../src/usageState');
+const { parseGeneratorMetadata } = require('../src/parse');
 const { parseUsage } = require('../src/claudeUsage');
 const { settingsView, isValidSetting } = require('../src/settingsUi');
 const { parseJson, validateBundle, check } = require('../scripts/locales.cjs');
 const base = require('../locales/en.json');
 const chinese = require('../locales/zh-TW.json');
+const supportedLocales = require('../locales/index.json');
+const catalogs = supportedLocales.map((locale) => require(`../locales/${locale}.json`));
 
 test('explicit language overrides editor language; auto normalizes supported locales without assuming all Chinese is Taiwan Chinese', () => {
     assert.equal(resolveLocale('zh-TW', 'en'), 'zh-TW');
     assert.equal(resolveLocale('en', 'zh-tw'), 'en');
     for (const language of ['zh-tw', 'ZH-TW', 'zh-Hant', 'zh-Hant-TW'])
         assert.equal(resolveLocale('auto', language), 'zh-TW');
-    for (const language of ['zh', 'zh-cn', 'zh-Hans', 'zh-HK', 'de', '', undefined, 'en-US'])
-        assert.equal(resolveLocale('auto', language), 'en');
+    const registeredTags = new Set();
+    for (const catalog of catalogs) {
+        assert.equal(resolveLocale(catalog.locale, 'en'), catalog.locale);
+        for (const tag of [catalog.locale, catalog.vscodeLocale, ...catalog.aliases]) {
+            registeredTags.add(tag.toLowerCase());
+            assert.equal(resolveLocale('auto', tag.toUpperCase()), catalog.locale);
+        }
+    }
+    for (const language of ['zh', 'zh-cn', 'zh-Hans', 'zh-HK', 'en-US'])
+        if (!registeredTags.has(language.toLowerCase())) assert.equal(resolveLocale('auto', language), 'en');
+    for (const language of ['unsupported_locale', '', undefined]) assert.equal(resolveLocale('auto', language), 'en');
     assert.equal(resolveLocale('../../private'), 'en');
 });
 
@@ -101,6 +113,41 @@ test('existing cached Claude windows and money issues are translated without cha
     assert.deepEqual(data, before);
 });
 
+test('missing model names are localized without translating real provider model labels', () => {
+    const now = Date.parse('2026-11-17T00:00:00Z');
+    for (const raw of [undefined, {}, 'MODEL_PLACEHOLDER_M9', 'models/', '   ']) {
+        const context = parseGeneratorMetadata({
+            generatorMetadata: [{ chatModel: { model: raw, usage: { inputTokens: 42 } } }]
+        }, {}, null);
+        const before = structuredClone(context);
+        const view = buildUsageState({ antigravity: { context } }, now);
+        assert.equal(context.modelKnown, false);
+        assert.equal(localizeView(view, createI18n('en')).providers[0].context.model, 'Unknown model');
+        const translated = localizeView(view, createI18n('zh-TW')).providers[0].context;
+        assert.equal(translated.model, '未知模型');
+        assert.equal(translated.usedTokens, 42);
+        assert.equal(translated.windowTokens, context.windowTokens);
+        assert.deepEqual(context, before);
+    }
+    const context = parseGeneratorMetadata({
+        generatorMetadata: [{ chatModel: { model: 'real-model', usage: { inputTokens: 42 } } }]
+    }, { 'real-model': 'Unknown model' }, null);
+    assert.equal(context.modelKnown, true);
+    assert.equal(localizeView(buildUsageState({ antigravity: { context } }, now), createI18n('zh-TW')).providers[0].context.model, 'Unknown model');
+});
+
+test('Claude errors retain their codes and use the catalog for display in every language', () => {
+    for (const code of ['cli-unavailable', 'timeout', 'cli-exited', 'request-refused', 'unsupported-payload', 'output-too-large', 'query-failed']) {
+        const view = buildUsageState({ claude: { error: code } });
+        const provider = view.providers.find((item) => item.id === 'claude');
+        assert.equal(provider.error, code);
+        for (const locale of supportedLocales) {
+            const i18n = createI18n(locale);
+            assert.equal(localizeView(view, i18n).providers[1].error, i18n.t(provider.errorKey));
+        }
+    }
+});
+
 test('quick settings resolve native manifest placeholders and validate language values', () => {
     const panel = settingsView((key) => key === 'display.language' ? 'zh-TW' : undefined, createI18n('zh-TW'));
     assert.equal(panel[0].title, '一般');
@@ -108,11 +155,12 @@ test('quick settings resolve native manifest placeholders and validate language 
     const language = panel.flatMap((group) => group.items).find((item) => item.key === 'display.language');
     assert.equal(language.label, '語言');
     assert.equal(language.value, 'zh-TW');
-    assert.deepEqual(language.options.map((option) => option.value), ['auto', 'en', 'zh-TW']);
+    assert.deepEqual(language.options.map((option) => option.value), ['auto', ...supportedLocales]);
     assert.equal(language.options[0].label, '跟隨編輯器');
     assert.doesNotMatch(JSON.stringify(panel), /%manifest\./);
-    for (const value of ['auto', 'en', 'zh-TW']) assert.equal(isValidSetting('display.language', value), true);
-    for (const value of ['zh', 'fr', {}, true, '../../private']) assert.equal(isValidSetting('display.language', value), false);
+    for (const value of ['auto', ...supportedLocales]) assert.equal(isValidSetting('display.language', value), true);
+    for (const value of ['unsupported_locale', undefined, null, {}, true, '../../private'])
+        assert.equal(isValidSetting('display.language', value), false);
 });
 
 test('catalog checks catch duplicate keys, missing strings, invalid variables and unknown messages', () => {
@@ -140,6 +188,8 @@ test('contributors can generate a template and ship another locale using only tr
         fs.mkdirSync(path.join(scratch, 'locales'));
         for (const file of ['package.json', 'scripts/locales.cjs', 'locales/en.json', 'locales/zh-TW.json', 'locales/message-context.json'])
             fs.copyFileSync(path.join(__dirname, '..', file), path.join(scratch, file));
+        for (const directory of ['src', 'media', 'test'])
+            fs.cpSync(path.join(__dirname, '..', directory), path.join(scratch, directory), { recursive: true });
         const command = (...args) => spawnSync(process.execPath, [path.join(scratch, 'scripts/locales.cjs'), ...args], { encoding: 'utf8' });
         const created = command('new', 'fr', 'Français');
         assert.equal(created.status, 0, created.stderr);
@@ -154,16 +204,30 @@ test('contributors can generate a template and ship another locale using only tr
         template.messages = { ...base.messages };
         template.messages['common.unknown'] = 'Inconnu';
         fs.writeFileSync(file, JSON.stringify(template));
+        assert.equal(command('new', 'de', 'Deutsch').status, 0);
+        const germanFile = path.join(scratch, 'locales/de.json');
+        const german = JSON.parse(fs.readFileSync(germanFile, 'utf8'));
+        german.messages = { ...base.messages, 'common.unknown': 'Unbekannt' };
+        fs.writeFileSync(germanFile, JSON.stringify(german));
         const built = command('build');
         assert.equal(built.status, 0, built.stderr);
-        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(scratch, 'locales/index.json'))), ['en', 'fr', 'zh-TW']);
+        // These exact lists describe this isolated fixture, not shipped languages.
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(scratch, 'locales/index.json'))), ['en', 'de', 'fr', 'zh-TW']);
         const pkg = JSON.parse(fs.readFileSync(path.join(scratch, 'package.json')));
         const language = pkg.contributes.configuration[0].properties['nexusAiUsage.display.language'];
-        assert.deepEqual(language.enum, ['auto', 'en', 'fr', 'zh-TW']);
-        assert.deepEqual(language.enumItemLabels.slice(1), ['English', 'Français', '繁體中文（台灣）']);
+        assert.deepEqual(language.enum, ['auto', 'en', 'de', 'fr', 'zh-TW']);
+        assert.deepEqual(language.enumItemLabels.slice(1), ['English', 'Deutsch', 'Français', '繁體中文（台灣）']);
         assert.ok(fs.existsSync(path.join(scratch, 'package.nls.fr.json')));
         const checked = command('check');
         assert.equal(checked.status, 0, checked.stderr);
+        // Run the real suite after adding data. Exclude this workflow to avoid recursion.
+        const suite = fs.readdirSync(path.join(scratch, 'test'))
+            .filter((name) => name.endsWith('.test.js')).map((name) => path.join('test', name));
+        const tested = spawnSync(process.execPath, [
+            '--test', '--test-reporter=dot',
+            '--test-name-pattern=^(?!contributors can generate a template)', ...suite
+        ], { cwd: scratch, encoding: 'utf8', timeout: 20000, maxBuffer: 1024 * 1024 });
+        assert.equal(tested.status, 0, tested.stdout + tested.stderr);
     } finally {
         fs.rmSync(scratch, { recursive: true, force: true });
     }

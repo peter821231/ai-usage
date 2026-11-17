@@ -181,15 +181,6 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
                   !!(reset.resetAt && Date.parse(reset.resetAt) <= now)
           }
         : null;
-    const errors = {
-        'cli-unavailable': 'Official Claude Code CLI is unavailable in this extension host',
-        timeout: 'Official Claude Code usage query timed out',
-        'cli-exited': 'Official Claude Code CLI exited before replying',
-        'request-refused': 'Official CLI refused the usage query; check Claude Code for sign-in or access details',
-        'unsupported-payload': 'Official CLI returned an unsupported usage format',
-        'output-too-large': 'Official CLI output exceeded the size limit',
-        'query-failed': 'Official Claude Code usage query failed'
-    };
     return {
         id: 'claude',
         title: data?.plan === 'enterprise' ? 'Claude Enterprise' : 'Claude Code',
@@ -199,7 +190,7 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
         primaryMetric: data?.plan !== 'enterprise' && groups[0].rows.length ? 'quota' : 'spend',
         plan: data?.plan || '',
         observedAt: timing.observedAt,
-        error: errors[snapshot.error] || snapshot.error || '',
+        error: snapshot.error || '',
         errorKey: ERROR_KEYS[snapshot.error],
         notice: data?.available === false ? 'Usage is unavailable for this sign-in method' : '',
         noticeKey: data?.available === false ? 'source.signInUnavailable' : null,

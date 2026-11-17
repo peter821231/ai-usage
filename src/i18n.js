@@ -35,6 +35,10 @@ function localizeView(view, i18n) {
             error: provider.errorKey ? t(provider.errorKey) : provider.error,
             notice: provider.noticeKey ? t(provider.noticeKey) : provider.notice,
             plan: provider.plan === 'Unknown' ? t('common.unknown') : provider.plan,
+            context: provider.context ? {
+                ...provider.context,
+                model: provider.context.modelKnown === false ? t('context.unknownModel') : provider.context.model
+            } : provider.context,
             groups: provider.groups.map((group) => ({
                 ...group,
                 label: group.groupType ? t(`group.${group.groupType}`) : group.label,

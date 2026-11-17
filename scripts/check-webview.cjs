@@ -11,6 +11,7 @@ const buildUsageState = (input, now) => localizeView(buildRawUsageState(input, n
 require('./locales.cjs').check();
 const { settingsView } = require(root + '/src/settingsUi');
 const { parseUsage } = require(root + '/src/claudeUsage');
+const { parseGeneratorMetadata } = require(root + '/src/parse');
 const { personalUsage, extraUsage } = require(root + '/test/fixtures/personal-claude.cjs');
 const original = Module._load;
 Module._load = function (key, ...args) {
@@ -467,6 +468,20 @@ const server = http.createServer((req, res) => {
     await sendState(localizeView(empty, chineseI18n));
     if (!(await page.locator('body').innerText()).includes('未知')) throw Error('Chinese missing readings hidden');
     if (await page.locator('.quota .meter .fill').count()) throw Error('Chinese unknown readings rendered as zero');
+    const missingModel = buildRawUsageState({
+        antigravity: { context: parseGeneratorMetadata({
+            generatorMetadata: [{ chatModel: { model: 'MODEL_PLACEHOLDER_M9', usage: { inputTokens: 42 } } }]
+        }, {}, null) },
+        claude: { enabled: false },
+        codex: { enabled: false }
+    }, now);
+    missingModel.showContext = true;
+    await sendState(localizeView(missingModel, chineseI18n));
+    if ((await page.locator('.context-model').textContent()) !== '未知模型')
+        throw Error('Missing context model was not translated');
+    await sendState(localizeView(missingModel, createI18n('en')));
+    if ((await page.locator('.context-model').textContent()) !== 'Unknown model')
+        throw Error('English missing context model was not restored');
     const longTranslation = structuredClone(chinese);
     longTranslation.i18n.messages['action.refresh'] = 'VeryLongTranslatedRefreshLabel'.repeat(6);
     longTranslation.i18n.messages['quota.used'] = 'VeryLongTranslatedPercentageLabel'.repeat(6);

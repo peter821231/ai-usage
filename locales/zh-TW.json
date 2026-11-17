@@ -180,6 +180,7 @@
     "manifest.setting.codex.showInStatusBar.description": "在狀態列顯示此供應商。",
     "error.agy.request": "額度摘要查詢失敗",
     "error.agy.noGroups": "額度摘要未包含可用的模型群組",
-    "scope.oauthApps": "OAuth 應用程式"
+    "scope.oauthApps": "OAuth 應用程式",
+    "context.unknownModel": "未知模型"
   }
 }

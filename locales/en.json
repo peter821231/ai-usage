@@ -177,6 +177,7 @@
     "manifest.setting.codex.showInStatusBar.description": "Include this provider in the status bar.",
     "error.agy.request": "Quota summary request failed",
     "error.agy.noGroups": "Quota summary contains no usable groups",
-    "scope.oauthApps": "OAuth apps"
+    "scope.oauthApps": "OAuth apps",
+    "context.unknownModel": "Unknown model"
   }
 }

@@ -1,5 +1,15 @@
 # Nexus AI Usage changelog
 
+## 0.1.9 — 2026-11-17 (Preview)
+
+- Derive language-selection test expectations from the registered catalogs so
+  new translations no longer require JavaScript test changes. Run the real test
+  suite with synthetic French and German catalogs as a regression check.
+- Translate the application fallback for missing context model names while
+  preserving actual provider labels and context values.
+- Keep Claude errors as codes in the usage state and resolve display text from
+  the language catalog, removing duplicate English error messages.
+
 ## 0.1.8 — 2026-11-17 (Preview)
 
 - Review Taiwan Traditional Chinese against the pinned Taiwan.md terminology
