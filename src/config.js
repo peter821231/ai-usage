@@ -12,6 +12,11 @@ function get(key, fallback) {
     if (definition?.type === 'boolean' && typeof value !== 'boolean') return fallback;
     return value;
 }
+function getExplicitBoolean(key) {
+    const setting = vscode.workspace.getConfiguration(SECTION).inspect(key);
+    return [setting?.workspaceFolderValue, setting?.workspaceValue, setting?.globalValue]
+        .find((value) => typeof value === 'boolean');
+}
 function set(key, value) {
     return vscode.workspace.getConfiguration(SECTION).update(key, value, vscode.ConfigurationTarget.Global);
 }
@@ -23,4 +28,4 @@ function timeZone() {
     const zone = get('display.timeZone', 'Asia/Taipei');
     return zone === 'UTC' ? 'UTC' : 'Asia/Taipei';
 }
-module.exports = { SECTION, get, set, interval, timeZone };
+module.exports = { SECTION, get, getExplicitBoolean, set, interval, timeZone };

@@ -226,7 +226,9 @@ Settings use only `nexusAiUsage.*`:
 - `refresh.activeInterval`: 30 seconds, 1 minute, 2 minutes or 5 minutes.
 - `refresh.pauseWhenUnfocused`: pause regular checks in the background.
 - `context.show`: optional conversation-context section; off by default.
-- `statusBar.show`, plus each provider's `enable` and `showInStatusBar`.
+- `statusBar.show`, plus each provider's `enable` and `showInStatusBar`. When
+  `showInStatusBar` is unset, the provider appears once quota or spend data is
+  available. An explicit setting overrides automatic visibility.
 - Under `antigravity.statusBar.*`, `geminiFiveHour`, `geminiWeekly` and `argonWeekly`
   are on by default; `claudeGptFiveHour` and `claudeGptWeekly` are off by default.
 - `claudeCode.timeoutSeconds`: 15, 30, 45 (default) or 60 seconds.

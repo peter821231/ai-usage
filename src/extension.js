@@ -16,6 +16,13 @@ const { DashboardProvider } = require('./webview');
 const { settingsView, isValidSetting } = require('./settingsUi');
 const { createI18n, localizeView } = require('./i18n');
 
+const PROVIDER_SETTINGS = { antigravity: 'antigravity', claude: 'claudeCode', codex: 'codex' };
+
+function hasUsage(provider) {
+    return Number.isFinite(provider.spend?.used) || Number.isFinite(provider.spend?.limit)
+        || provider.groups.some((group) => group.rows.some((row) => Number.isFinite(row.usedPct)));
+}
+
 class Monitor {
     constructor(context) {
         this.context = context;
@@ -171,18 +178,22 @@ class Monitor {
             percentMode: cfg.get('display.percentMode', 'used'),
             enterpriseResetSchedule: cfg.get('claudeCode.enterpriseResetSchedule', 'monthlyUtc')
         };
-        for (const [id, key] of [
-            ['antigravity', 'antigravity'],
-            ['claude', 'claudeCode'],
-            ['codex', 'codex']
-        ]) {
+        for (const [id, key] of Object.entries(PROVIDER_SETTINGS)) {
             input[id] = { ...input[id], enabled: cfg.get(`${key}.enable`, true) };
         }
         const i18n = createI18n(cfg.get('display.language', 'auto'), vscode.env.language);
         const view = localizeView(buildUsageState(input), i18n);
+        const statusVisibility = new Map();
+        const hidden = [];
+        for (const provider of view.providers) {
+            const key = `${PROVIDER_SETTINGS[provider.id]}.showInStatusBar`;
+            const visible = cfg.getExplicitBoolean(key) ?? hasUsage(provider);
+            statusVisibility.set(key, visible);
+            if (!visible) hidden.push(provider.id);
+        }
         view.showContext = cfg.get('context.show', false);
         view.timeZone = cfg.timeZone();
-        view.settings = settingsView((k) => cfg.get(k), i18n);
+        view.settings = settingsView((key) => statusVisibility.get(key) ?? cfg.get(key), i18n);
         this.bar.update(view, {
             show: cfg.get('statusBar.show', true),
             antigravityWindows: Object.fromEntries(
@@ -190,9 +201,7 @@ class Monitor {
                     choice.key, cfg.get(`antigravity.statusBar.${choice.key}`, choice.default)
                 ])
             ),
-            hidden: ['antigravity', 'claude', 'codex'].filter(
-                (id) => !cfg.get(`${id === 'claude' ? 'claudeCode' : id}.showInStatusBar`, true)
-            )
+            hidden
         });
         this.view.setState(view);
     }

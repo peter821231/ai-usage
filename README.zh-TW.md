@@ -172,7 +172,7 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 - `refresh.activeInterval`：30 秒、1 分鐘、2 分鐘或 5 分鐘。
 - `refresh.pauseWhenUnfocused`：在背景時暫停定期檢查。
 - `context.show`：可選的對話脈絡區塊，預設關閉。
-- `statusBar.show`，以及各服務的 `enable` 與 `showInStatusBar`。
+- `statusBar.show`，以及各服務的 `enable` 與 `showInStatusBar`。未設定 `showInStatusBar` 時，讀到額度或支出資料後，該服務會自動顯示。手動設定優先。
 - `antigravity.statusBar.*` 下的 `geminiFiveHour`、`geminiWeekly`、`argonWeekly` 預設開啟；`claudeGptFiveHour`、`claudeGptWeekly` 預設關閉。
 - `claudeCode.timeoutSeconds`：15、30、45（預設）或 60 秒。
 - `claudeCode.enterpriseResetSchedule`：`monthlyUtc`（已驗證的每月 UTC 規則）或 `unknown`（僅採用來源）。依規則推算的日期會明確標示。
