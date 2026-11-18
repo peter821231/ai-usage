@@ -1,5 +1,10 @@
 # Nexus AI Usage changelog
 
+## 0.1.11 — 2026-11-18 (Preview)
+
+- Fix broken README screenshots on the installed extension details page by
+  rewriting their relative paths to HTTPS image URLs when packaging the VSIX.
+
 ## 0.1.10 — 2026-11-17 (Preview)
 
 - Store translations in a Map to avoid dynamic property writes flagged by CodeQL.
