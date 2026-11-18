@@ -6,6 +6,7 @@
   segments, and the reset countdown and time.
 - Add an optional icon-only status bar mode under **Settings → Status Bar**.
 - Use **AI Usage** as the display name.
+- Use an original gauge icon in the Activity Bar and Extensions view.
 
 ## 0.1.18 — 2026-11-18 (Preview)
 
