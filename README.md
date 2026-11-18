@@ -116,16 +116,16 @@ telemetry, burn-rate prediction or notifications are enabled in this version.
 
 ## Requirements and limits
 
-Install Nexus in the IDE where you use the providers' official integrations.
-Each source must be reachable from the same extension host as Nexus. Windows,
+Install AI Usage in the IDE where you use the providers' official integrations.
+Each source must be reachable from the same extension host as AI Usage. Windows,
 WSL, SSH and containers each have their own files, processes and sign-in state.
 For example, a WSL workspace needs the integrations and data in its WSL host.
 The IDE must support VS Code extensions and satisfy the version range in
 [`package.json`](package.json).
 
-| Provider | Requirements in the Nexus extension host |
+| Provider | Requirements in the AI Usage extension host |
 |---|---|
-| Antigravity | Run and sign in to Antigravity IDE or its official editor integration. Nexus needs a reachable Antigravity language server that can return quota data. |
+| Antigravity | Run and sign in to Antigravity IDE or its official editor integration. AI Usage needs a reachable Antigravity language server that can return quota data. |
 | Claude | Install the official Claude Code extension (`anthropic.claude-code`) in the IDE host and sign in to the Claude account or Team workspace you want to monitor. Standalone Claude Desktop sign-in is outside the supported setup. |
 | Codex | Use the official Codex integration in the host. An eligible local session must write a rate-limit event under the default `~/.codex/sessions` directory. The dashboard shows the most recent event it finds, with its original time. |
 
@@ -144,7 +144,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 | Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
 | Codex | Rate-limit events in local `~/.codex/sessions` logs | Check about once a minute; old events are labelled **Last recorded** in neutral styling, retaining their real timestamps and values. Read errors still warn. Other devices may have newer usage. |
 
-If the bundled Claude Code CLI cannot start, Nexus can try the official native
+If the bundled Claude Code CLI cannot start, AI Usage can try the official native
 install location in the same host (`~/.local/bin/claude` on macOS/Linux or
 `%USERPROFILE%\.local\bin\claude.exe` on Windows). **Diagnostics** reports the
 presence of both executables. See [Claude Code installation troubleshooting](https://code.claude.com/docs/en/troubleshoot-install).

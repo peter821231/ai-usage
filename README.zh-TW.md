@@ -81,11 +81,11 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 ## 使用條件與限制
 
-請將 Nexus 安裝在你使用各家官方整合的 IDE。資料來源必須能由同一個擴充套件主機存取。Windows、WSL、SSH 與容器各自有獨立的檔案、程序和登入狀態。例如，用 WSL 開啟的工作區需要在 WSL 主機設定官方整合並產生用量資料。IDE 須支援 VS Code 擴充套件並符合 [`package.json`](package.json) 的版本範圍。
+請將 AI Usage 安裝在你使用各家官方整合的 IDE。資料來源必須能由同一個擴充套件主機存取。Windows、WSL、SSH 與容器各自有獨立的檔案、程序和登入狀態。例如，用 WSL 開啟的工作區需要在 WSL 主機設定官方整合並產生用量資料。IDE 須支援 VS Code 擴充套件並符合 [`package.json`](package.json) 的版本範圍。
 
-| 服務 | Nexus 所在的擴充套件主機需要具備的條件 |
+| 服務 | AI Usage 所在的擴充套件主機需要具備的條件 |
 | --- | --- |
-| Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。Nexus 需要連到可回傳額度的 Antigravity 語言伺服器。 |
+| Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。AI Usage 需要連到可回傳額度的 Antigravity 語言伺服器。 |
 | Claude | 在該 IDE 主機安裝官方 Claude Code 擴充套件（`anthropic.claude-code`），並登入要監看的 Claude 帳戶或 Team 工作區。僅登入 Claude Desktop 的環境不在支援範圍。 |
 | Codex | 在同一主機使用官方 Codex 整合，並讓本機工作階段在預設的 `~/.codex/sessions` 寫入額度限制事件。面板會顯示讀到的最新事件及原始時間。 |
 
@@ -104,7 +104,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 | Claude | 官方 Claude Code 擴充套件內附的 CLI，或同一主機的官方原生 CLI 備援 | 約每五分鐘查詢一次。手動查詢至少間隔一分鐘，失敗後會逐步延長重試間隔。讀數超過十分鐘會標示為過時。同一主機的多個視窗共用查詢租約與快取。 |
 | Codex | 本機 `~/.codex/sessions` 記錄檔中的額度限制事件 | 約每分鐘檢查一次；舊事件以中性樣式標示 **Last recorded（最近記錄）**，保留真實時間戳記與數值。讀取錯誤仍會警示。其他裝置可能有較新的用量。 |
 
-若 Claude Code 擴充套件內附的 CLI 無法啟動，Nexus 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
+若 Claude Code 擴充套件內附的 CLI 無法啟動，AI Usage 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
 
 監看工具不會讀取 Claude 憑證檔案，也不會要求提供權杖或 Cookie。
 身分驗證由官方 CLI 處理。工具會在擴充套件自己的儲存資料夾中，使用 `initialize` 與 `get_usage` 查詢，
