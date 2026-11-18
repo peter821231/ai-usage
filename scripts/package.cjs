@@ -12,7 +12,11 @@ const result = spawnSync(
         vsce,
         'package',
         '--no-dependencies',
-        '--no-rewrite-relative-links',
+        // The extension details page loads README images over HTTPS.
+        '--githubBranch',
+        'main',
+        '--baseImagesUrl',
+        'https://raw.githubusercontent.com/peter821231/nexus-ai-usage/main/',
         '--allow-missing-repository',
         '--out',
         `artifacts/${pkg.name}-${pkg.version}.vsix`
