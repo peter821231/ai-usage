@@ -2,8 +2,8 @@
 
 ## 0.1.19 — 2026-11-18 (Preview)
 
-- Group quota windows in the hover with a status dot, a segmented progress bar,
-  and the reset countdown and time.
+- Group quota windows in the hover with a status dot, a progress bar with larger
+  segments, and the reset countdown and time.
 - Add an optional icon-only status bar mode under **Settings → Status Bar**.
 - Use **AI Usage** as the display name.
 

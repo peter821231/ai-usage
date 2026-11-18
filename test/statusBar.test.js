@@ -108,7 +108,7 @@ test('status bar keeps Argon and window names distinct and money separate from c
     assert.doesNotMatch(items[0].tooltip.value, /Status bar space is limited|Source event|Fetched/);
     assert.equal(items.length, 1);
     assert.doesNotMatch(items[0].text, /Context/);
-    assert.match(items[0].tooltip.value, /🟢 5\\-hour .*?`▪▫{9}` .*?\*\*10%\*\*/);
+    assert.match(items[0].tooltip.value, /🟢 5\\-hour .*?`◼\uFE0E(?:◻\uFE0E){9}` .*?\*\*10%\*\*/);
 });
 
 test('status bar and hover distinguish Fable from the all-models weekly window', () => {
@@ -237,8 +237,8 @@ test('hover charts and warning dots distinguish zero, missing and low quota in e
     const { progress, hover } = load();
     assert.equal(progress(null), '');
     assert.equal(progress(undefined), '');
-    assert.equal(progress(0), '`▫▫▫▫▫▫▫▫▫▫`');
-    assert.equal(progress(100), '`▪▪▪▪▪▪▪▪▪▪`');
+    assert.equal(progress(0), '`' + '◻\uFE0E'.repeat(10) + '`');
+    assert.equal(progress(100), '`' + '◼\uFE0E'.repeat(10) + '`');
     const v = view();
     v.providers[1].context = { pct: 68 };
     const codexRows = v.providers[2].groups[0].rows;
@@ -248,7 +248,7 @@ test('hover charts and warning dots distinguish zero, missing and low quota in e
     );
     const used = hover(v).value;
     assert.match(used, /🟢 Account budget .*?\*\*17\\\.6%\*\*/);
-    assert.match(used, /🟢 5\\-hour .*?`▫{10}` .*?\*\*0%\*\*/);
+    assert.match(used, /🟢 5\\-hour .*?`(?:◻\uFE0E){10}` .*?\*\*0%\*\*/);
     assert.match(used, /⚪ Weekly &ensp; \*\*Unknown\*\*/);
     assert.match(used, /🟡 Low .*?\*\*75%\*\*/);
     assert.match(used, /🔴 Critical .*?\*\*90%\*\*/);
@@ -257,7 +257,7 @@ test('hover charts and warning dots distinguish zero, missing and low quota in e
     const left = hover(v).value;
     assert.match(left, /🟢 Account budget .*?\*\*82\\\.4%\*\* · USD 164\\\.86/);
     assert.match(left, /🟡 Low .*?\*\*25%\*\*/);
-    assert.match(left, /🔴 Critical .*?`▪▫{9}` .*?\*\*10%\*\*/);
+    assert.match(left, /🔴 Critical .*?`◼\uFE0E(?:◻\uFE0E){9}` .*?\*\*10%\*\*/);
 });
 test('unknown, stale, errors and used/remaining semantics are explicit', () => {
     const { StatusBar, items } = load();

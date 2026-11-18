@@ -63,7 +63,7 @@ function summary(provider, mode, i18n = english) {
 function progress(value) {
     if (!Number.isFinite(value)) return '';
     const filled = Math.round(clampPct(value) / 10);
-    return `\`${'▪'.repeat(filled)}${'▫'.repeat(10 - filled)}\``;
+    return `\`${'◼\uFE0E'.repeat(filled)}${'◻\uFE0E'.repeat(10 - filled)}\``;
 }
 function quotaDot(usedPct) {
     // Keep the warning level tied to usage when the display switches to remaining.
