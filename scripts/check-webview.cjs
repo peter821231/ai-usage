@@ -238,10 +238,11 @@ const server = http.createServer((req, res) => {
     await chosen('claudeGptFiveHour').setChecked(true);
     if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'antigravity.statusBar.claudeGptFiveHour' && m.value === true))))
         throw Error('Antigravity summary choice not wired');
-    const checkbox = page.locator('input[type=checkbox]').first();
-    await checkbox.setChecked(!(await checkbox.isChecked()));
-    if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting'))))
-        throw Error('Settings not wired');
+    const compactMode = page.getByRole('checkbox', { name: 'Compact mode' });
+    if (await compactMode.isChecked()) throw Error('Compact mode should default to off');
+    await compactMode.setChecked(true);
+    if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'statusBar.compact' && m.value === true))))
+        throw Error('Compact mode setting not wired');
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const card = page.locator('[data-provider="antigravity"]');
     await page.getByRole('button', { name: 'Collapse Antigravity', exact: true }).click();
@@ -473,6 +474,7 @@ const server = http.createServer((req, res) => {
     if ((await page.locator('html').getAttribute('lang')) !== 'zh-TW') throw Error('Document language did not change');
     if (!(await page.getByRole('button', { name: '重新整理', exact: true }).isVisible())) throw Error('Chinese actions missing');
     if (!(await page.locator('.language-note').textContent()).includes('編輯器原生設定頁')) throw Error('Language scope explanation missing');
+    if (!(await page.getByRole('checkbox', { name: '精簡模式' }).isVisible())) throw Error('Chinese compact mode label missing');
     if (!(await languageSelect.evaluate((node) => node === document.activeElement))) throw Error('Language switch lost focus');
     if (!(await page.getByRole('button', { name: '展開 Codex', exact: true }).isVisible())) throw Error('Language switch lost collapse state');
     if (!(await page.locator('[data-provider="antigravity"] .source-details').evaluate((node) => node.open))) throw Error('Language switch lost source details');

@@ -7,7 +7,7 @@ const PREFIX = 'nexusAiUsage.';
 // Display labels are resolved for each render, never at module load time.
 const LABEL_KEYS = new Set([
     'display.language', 'display.percentMode', 'display.timeZone', 'refresh.activeInterval',
-    'refresh.pauseWhenUnfocused', 'context.show', 'statusBar.show',
+    'refresh.pauseWhenUnfocused', 'context.show', 'statusBar.show', 'statusBar.compact',
     'antigravity.statusBar.geminiFiveHour', 'antigravity.statusBar.geminiWeekly',
     'antigravity.statusBar.claudeGptFiveHour', 'antigravity.statusBar.claudeGptWeekly',
     'antigravity.statusBar.argonWeekly', 'claudeCode.timeoutSeconds', 'claudeCode.enterpriseResetSchedule'

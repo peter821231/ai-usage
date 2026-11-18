@@ -1,4 +1,12 @@
-# Nexus AI Usage changelog
+# AI Usage changelog
+
+## 0.1.19 — 2026-11-18 (Preview)
+
+- Group quota windows in the hover with a status dot, a progress bar with larger
+  segments, and the reset countdown and time.
+- Add an optional icon-only status bar mode under **Settings → Status Bar**.
+- Use **AI Usage** as the display name.
+- Use an original gauge icon in the Activity Bar and Extensions view.
 
 ## 0.1.18 — 2026-11-18 (Preview)
 

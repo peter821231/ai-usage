@@ -1,4 +1,4 @@
-# Nexus AI Usage (Preview)
+# AI Usage
 
 **English** | [繁體中文（台灣）](README.zh-TW.md)
 
@@ -12,7 +12,18 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## UI preview — 0.1.6
+## UI preview — 0.1.19
+
+Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
+Hover over it for grouped limits, status dots, larger progress segments, and
+reset times. Click the gauge to open the dashboard.
+
+![AI Usage 0.1.19 compact status bar and grouped hover with demo data for Antigravity, Claude Enterprise, and Codex](docs/images/v0.1.19-compact-hover-demo.png)
+
+The preview uses demo values. The maintainer verified the larger segments and
+compact mode in the IDE on 2026-11-18 using the Traditional Chinese interface.
+
+## Earlier UI preview — 0.1.6
 
 The status bar, dashboard and hover below are maintainer-provided screenshots from
 Antigravity IDE on **2026-11-17**. Values are account-specific snapshots, not live
@@ -25,8 +36,6 @@ readings or fixed budgets. The settings preview is separately labelled synthetic
 
 Gemini **5-hour / Weekly** and **Argon Weekly** are selected by default. Claude/GPT
 can be added in settings; the complete limits remain in the hover and dashboard.
-Status bar width is shared with the IDE and other extensions, so choose the
-summaries that fit your window.
 
 ### Detailed dashboard
 
@@ -95,7 +104,8 @@ generate a template and add another language.
   details** disclosure. Model labels and internal Antigravity credit fields are read without
   extra queries. The meaning and scale of those credit fields have not been
   verified against the official Usage UI; they are not confirmed quota balances.
-- The status bar hover includes compact usage charts and used/remaining values.
+- The status bar hover groups quota windows with a status dot, a segmented
+  progress bar, the selected percentage and the reset time.
 - Antigravity's status summary defaults to **Gemini Models 5-hour / Weekly** and
   independent **Gemini 4 Argon Weekly**. Five boolean choices let you include or
   omit each window; these affect only the summary, not the full hover or dashboard.
@@ -115,16 +125,16 @@ telemetry, burn-rate prediction or notifications are enabled in this version.
 
 ## Requirements and limits
 
-Install Nexus in the IDE where you use the providers' official integrations.
-Each source must be reachable from the same extension host as Nexus. Windows,
+Install AI Usage in the IDE where you use the providers' official integrations.
+Each source must be reachable from the same extension host as AI Usage. Windows,
 WSL, SSH and containers each have their own files, processes and sign-in state.
 For example, a WSL workspace needs the integrations and data in its WSL host.
 The IDE must support VS Code extensions and satisfy the version range in
 [`package.json`](package.json).
 
-| Provider | Requirements in the Nexus extension host |
+| Provider | Requirements in the AI Usage extension host |
 |---|---|
-| Antigravity | Run and sign in to Antigravity IDE or its official editor integration. Nexus needs a reachable Antigravity language server that can return quota data. |
+| Antigravity | Run and sign in to Antigravity IDE or its official editor integration. AI Usage needs a reachable Antigravity language server that can return quota data. |
 | Claude | Install the official Claude Code extension (`anthropic.claude-code`) in the IDE host and sign in to the Claude account or Team workspace you want to monitor. Standalone Claude Desktop sign-in is outside the supported setup. |
 | Codex | Use the official Codex integration in the host. An eligible local session must write a rate-limit event under the default `~/.codex/sessions` directory. The dashboard shows the most recent event it finds, with its original time. |
 
@@ -132,7 +142,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 
 1. Download `nexus-ai-usage-<version>.vsix` from [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) or build it with `npm run package` into `artifacts/`.
 2. In the target IDE, run **Extensions: Install from VSIX…** and select the file.
-3. Open **Nexus AI Usage** in the Activity Bar and run **Show Diagnostics** to check the local sources.
+3. Open **AI Usage** in the Activity Bar and run **Show Diagnostics** to check the local sources.
 4. Compare values and reset times with each provider's official Usage view. Provider caches and the query interval can delay new readings.
 
 ## Sources, credentials and freshness
@@ -143,7 +153,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 | Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
 | Codex | Rate-limit events in local `~/.codex/sessions` logs | Check about once a minute; old events are labelled **Last recorded** in neutral styling, retaining their real timestamps and values. Read errors still warn. Other devices may have newer usage. |
 
-If the bundled Claude Code CLI cannot start, Nexus can try the official native
+If the bundled Claude Code CLI cannot start, AI Usage can try the official native
 install location in the same host (`~/.local/bin/claude` on macOS/Linux or
 `%USERPROFILE%\.local\bin\claude.exe` on Windows). **Diagnostics** reports the
 presence of both executables. See [Claude Code installation troubleshooting](https://code.claude.com/docs/en/troubleshoot-install).
@@ -216,7 +226,7 @@ signed-in Pro / Max or Team accounts is pending.
 ## Commands and settings
 
 Commands: **Refresh Usage**, **Quick Settings**, **Open Settings**, **Toggle Used /
-Remaining**, and **Show Diagnostics**, all under **Nexus AI Usage**.
+Remaining**, and **Show Diagnostics**, all under **AI Usage**.
 
 Settings use only `nexusAiUsage.*`:
 
@@ -229,6 +239,7 @@ Settings use only `nexusAiUsage.*`:
 - `statusBar.show`, plus each provider's `enable` and `showInStatusBar`. When
   `showInStatusBar` is unset, the provider appears once quota or spend data is
   available. An explicit setting overrides automatic visibility.
+- `statusBar.compact`: show only the quota gauge icon. Off by default.
 - Under `antigravity.statusBar.*`, `geminiFiveHour`, `geminiWeekly` and `argonWeekly`
   are on by default; `claudeGptFiveHour` and `claudeGptWeekly` are off by default.
 - `claudeCode.timeoutSeconds`: 15, 30, 45 (default) or 60 seconds.
@@ -245,7 +256,8 @@ still include all monitored windows, even ones omitted from the status bar.
 Status bar space is shared with the IDE and other extensions. Width, font/zoom
 and the other items determine what fits; this extension does not claim a fixed
 character maximum or silently truncate values. Choose the summaries you need.
-The hover and dashboard settings explicitly explain that only a subset is shown.
+The hover includes every monitored limit. Its dots turn yellow at 75% used and
+red at 90% used, and a white dot marks an unknown reading.
 See [0.1.6 status-bar choices](docs/status-bar-0.1.6.md) for the exact settings and
 the distinction between recorded Codex data and read failures.
 

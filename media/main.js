@@ -353,7 +353,7 @@
         const header = el('header');
         const title = el('div');
         title.append(
-            el('h1', 'sr-only', 'Nexus AI Usage'),
+            el('h1', 'sr-only', 'AI Usage'),
             el(
                 'p',
                 'muted',

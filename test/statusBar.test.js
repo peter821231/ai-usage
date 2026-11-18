@@ -102,14 +102,13 @@ test('status bar keeps Argon and window names distinct and money separate from c
     assert.doesNotMatch(items[0].text, /Claude\/GPT/);
     assert.match(items[0].text, /Claude USD 35.14 \/ 200.00/);
     assert.match(items[0].text, /Codex 5h 0% · wk 20%/);
-    assert.match(items[0].tooltip.value, /164\\?.86/);
+    assert.match(items[0].tooltip.value, /USD 35\\?\.14 \/ USD 200\\?\.00/);
     assert.match(items[0].tooltip.value, /Gemini 4 Argon/);
     assert.match(items[0].tooltip.value, /Claude and GPT models/);
-    assert.match(items[0].tooltip.value, /Status bar space is limited/);
+    assert.doesNotMatch(items[0].tooltip.value, /Status bar space is limited|Source event|Fetched/);
     assert.equal(items.length, 1);
     assert.doesNotMatch(items[0].text, /Context/);
-    assert.match(items[0].tooltip.value, /\| Usage \|/);
-    assert.match(items[0].tooltip.value, /`[█░]+`/);
+    assert.match(items[0].tooltip.value, /🟢 5\\-hour .*?`◼\uFE0E(?:◻\uFE0E){9}` .*?\*\*10%\*\*/);
 });
 
 test('status bar and hover distinguish Fable from the all-models weekly window', () => {
@@ -126,7 +125,7 @@ test('status bar and hover distinguish Fable from the all-models weekly window',
     }, now);
     bar.update(state);
     assert.match(items[0].text, /Claude 5h 13% · wk 3% · Fable wk 5%/);
-    assert.match(items[0].tooltip.value, /\*\*Fable\*\* \| Weekly/);
+    assert.match(items[0].tooltip.value, /\*\*Fable\*\*  \n&ensp;🟢 Weekly/);
 
     const enterprise = buildUsageState({
         antigravity: { enabled: false },
@@ -170,8 +169,8 @@ test('Chinese status summaries use stable identities and retain every quota in t
     assert.match(items[0].tooltip.value, /Gemini 模型/);
     assert.match(items[0].tooltip.value, /Gemini 4 Argon/);
     assert.match(items[0].tooltip.value, /未知/);
-    assert.match(items[0].tooltip.value, /已使用預算/);
-    assert.match(items[0].tooltip.value, /\[開啟完整資訊\]\(command:nexusAiUsage.dashboard.focus\)/);
+    assert.match(items[0].tooltip.value, /帳戶預算/);
+    assert.match(items[0].tooltip.value, /\[開啟儀表板\]\(command:nexusAiUsage.dashboard.focus\)/);
     v.providers[0].groups[0].label = '[unsafe](command:evil)';
     bar.update(v);
     assert.doesNotMatch(items[0].tooltip.value, /\[unsafe\]\(command:evil\)/);
@@ -190,9 +189,17 @@ test('unselected Antigravity windows do not color the selected summary', () => {
     assert.equal(items[0].backgroundColor, undefined);
     bar.update(v, { antigravityWindows: { claudeGptFiveHour: true } });
     assert.ok(items[0].backgroundColor);
+    bar.update(v, { compact: true, antigravityWindows: { claudeGptFiveHour: true } });
+    assert.equal(items[0].text, '$(dashboard)');
+    assert.match(items[0].accessibilityInformation.label, /Gemini/);
+    assert.ok(items[0].backgroundColor);
+    bar.update(v, { compact: true, show: false });
+    assert.equal(items[0].visible, false);
+    bar.update(v, { compact: true, hidden: ['antigravity'] });
+    assert.equal(items[0].visible, false);
 });
 
-test('old Codex records keep real values and timestamps without a yellow idle warning; read errors still warn', () => {
+test('old Codex records keep real values and reset time without a yellow idle warning; read errors still warn', () => {
     const { StatusBar, items } = load();
     const bar = new StatusBar();
     const at = now - 29*60000;
@@ -210,6 +217,7 @@ test('old Codex records keep real values and timestamps without a yellow idle wa
     assert.doesNotMatch(items[0].text, /[~!]/);
     assert.equal(items[0].backgroundColor, undefined);
     assert.match(items[0].tooltip.value, /Last recorded/);
+    assert.ok(items[0].tooltip.value.includes('↻ 1h 0m \\(Mon 11:00\\)'));
     assert.equal(state().providers[0].groups[0].rows[0].observedAt, at);
     input.codex.data.limits.windows[0].resetsAt = new Date(now-1000).toISOString();
     const expired = state().providers[0].groups[0].rows[0];
@@ -217,6 +225,7 @@ test('old Codex records keep real values and timestamps without a yellow idle wa
     assert.equal(expired.usedPct, 5);
     bar.update(state());
     assert.equal(items[0].backgroundColor, undefined);
+    assert.match(items[0].tooltip.value, /Awaiting update · Last recorded/);
     input.codex.error = 'Could not read local Codex rate-limit events';
     bar.update(state());
     assert.ok(items[0].backgroundColor);
@@ -224,17 +233,31 @@ test('old Codex records keep real values and timestamps without a yellow idle wa
     assert.match(items[0].tooltip.value, /Error/);
 });
 
-test('hover usage charts distinguish unknown from real zero and keep spend independent', () => {
+test('hover charts and warning dots distinguish zero, missing and low quota in either percent mode', () => {
     const { progress, hover } = load();
-    assert.equal(progress(null), 'Unknown');
-    assert.equal(progress(undefined), 'Unknown');
-    assert.equal(progress(0), '`░░░░░░░░░░░░`');
-    assert.equal(progress(25), '`███░░░░░░░░░`');
+    assert.equal(progress(null), '');
+    assert.equal(progress(undefined), '');
+    assert.equal(progress(0), '`' + '◻\uFE0E'.repeat(10) + '`');
+    assert.equal(progress(100), '`' + '◼\uFE0E'.repeat(10) + '`');
     const v = view();
     v.providers[1].context = { pct: 68 };
-    const text = hover(v).value;
-    assert.match(text, /17\\?\.6% budget used/);
-    assert.doesNotMatch(text, /68% budget/);
+    const codexRows = v.providers[2].groups[0].rows;
+    codexRows.push(
+        { label: 'Low', usedPct: 75, remainingPct: 25 },
+        { label: 'Critical', usedPct: 90, remainingPct: 10 }
+    );
+    const used = hover(v).value;
+    assert.match(used, /🟢 Account budget .*?\*\*17\\\.6%\*\*/);
+    assert.match(used, /🟢 5\\-hour .*?`(?:◻\uFE0E){10}` .*?\*\*0%\*\*/);
+    assert.match(used, /⚪ Weekly &ensp; \*\*Unknown\*\*/);
+    assert.match(used, /🟡 Low .*?\*\*75%\*\*/);
+    assert.match(used, /🔴 Critical .*?\*\*90%\*\*/);
+    assert.doesNotMatch(used, /68%/);
+    v.percentMode = 'left';
+    const left = hover(v).value;
+    assert.match(left, /🟢 Account budget .*?\*\*82\\\.4%\*\* · USD 164\\\.86/);
+    assert.match(left, /🟡 Low .*?\*\*25%\*\*/);
+    assert.match(left, /🔴 Critical .*?`◼\uFE0E(?:◻\uFE0E){9}` .*?\*\*10%\*\*/);
 });
 test('unknown, stale, errors and used/remaining semantics are explicit', () => {
     const { StatusBar, items } = load();
@@ -246,7 +269,7 @@ test('unknown, stale, errors and used/remaining semantics are explicit', () => {
     bar.update(v);
     assert.match(items[0].text, /Codex 5h 100% · wk 80% !/);
     assert.match(items[0].text, /left$/);
-    assert.match(items[0].tooltip.value, /stale/);
+    assert.match(items[0].tooltip.value, /Stale/);
     assert.match(items[0].tooltip.value, /Error/);
     bar.update(buildUsageState({}, now));
     assert.match(items[0].text, /Unknown/);

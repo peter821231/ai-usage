@@ -1,9 +1,10 @@
 'use strict';
 const vscode = require('vscode');
-const { escapeMarkdown: esc, textBar } = require('./util');
+const { clampPct, escapeMarkdown: esc } = require('./util');
 const { createI18n } = require('./i18n');
 const { createTranslator } = require('../media/i18n');
 const FOCUS = 'nexusAiUsage.dashboard.focus';
+const QUOTA_ICON = '$(dashboard)';
 const AG_STATUS_WINDOWS = [
     { key: 'geminiFiveHour', groupType: 'gemini', windowType: 'fiveHour', default: true },
     { key: 'geminiWeekly', groupType: 'gemini', windowType: 'weekly', default: true },
@@ -12,7 +13,6 @@ const AG_STATUS_WINDOWS = [
     { key: 'argonWeekly', groupType: 'argon', windowType: 'weekly', default: true }
 ];
 const english = createI18n('en');
-const STATUS_SPACE_NOTE = english.t('status.spaceNote');
 const translator = (view) => view.i18n ? createTranslator(view.i18n) : english;
 function selectStatusProvider(provider, choices = {}) {
     if (provider.id !== 'antigravity') return provider;
@@ -60,63 +60,75 @@ function summary(provider, mode, i18n = english) {
     }
     return `${provider.id === 'antigravity' ? 'AG' : provider.id === 'codex' ? 'Codex' : 'Claude'} ${values.join(' · ') || i18n.unknown()}${marker(provider)}`;
 }
-function progress(value, i18n = english) {
-    return typeof value === 'number' && Number.isFinite(value) ? `\`${textBar(value, 12)}\`` : i18n.unknown();
+function progress(value) {
+    if (!Number.isFinite(value)) return '';
+    const filled = Math.round(clampPct(value) / 10);
+    return `\`${'◼\uFE0E'.repeat(filled)}${'◻\uFE0E'.repeat(10 - filled)}\``;
+}
+function quotaDot(usedPct) {
+    // Keep the warning level tied to usage when the display switches to remaining.
+    if (!Number.isFinite(usedPct)) return '⚪';
+    if (usedPct >= 90) return '🔴';
+    return usedPct >= 75 ? '🟡' : '🟢';
+}
+function hoverReading(label, usedPct, displayedPct, i18n) {
+    return [`${quotaDot(usedPct)} ${esc(label)}`, progress(displayedPct), `**${esc(pct(displayedPct, i18n))}**`]
+        .filter(Boolean).join(' &ensp; ');
 }
 function compactReset(row, zone, now, i18n = english) {
     const { t } = i18n;
-    if (!row.resetAt) return i18n.unknown();
-    if (row.resetPending) return t('reset.elapsedShort');
+    if (!row.resetAt) return '—';
+    if (row.resetPending) return `↻ ${t('reset.elapsedShort')}`;
     const wall = i18n.stamp(row.resetAt, zone, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
-    return `${i18n.duration(row.resetAt, now, false, 'floor')} (${wall})${row.resetBasis === 'event-relative' ? ' · ' + t('reset.event') : ''}${row.resetBasis === 'official-monthly-rule' ? ' · ' + t('reset.monthly') : ''}`;
+    return `↻ ${i18n.duration(row.resetAt, now, false, 'floor')} (${wall})`;
 }
 function hover(view) {
     const i18n = translator(view);
     const { t } = i18n;
     const text = (key, args) => esc(t(key, args));
-    const md = new vscode.MarkdownString('', true);
+    const md = new vscode.MarkdownString();
     md.isTrusted = { enabledCommands: [FOCUS] };
     const left = view.percentMode === 'left';
     const main = left ? 'remainingPct' : 'usedPct';
-    const other = left ? 'usedPct' : 'remainingPct';
-    const label = t(left ? 'quota.remaining' : 'quota.used');
+    const zone = view.timeZone || 'Asia/Taipei';
     md.appendMarkdown(`**${text('hover.title', { mode: t(left ? 'quota.remaining.short' : 'quota.used.short') })}**\n\n`);
-    md.appendMarkdown(`${text('status.spaceNote')}\n\n`);
     for (const p of view.providers) {
-        const rows = p.groups.flatMap((g) => g.rows);
-        const times = [...new Set([...rows.map((r) => r.observedAt), p.spend?.observedAt].filter((at) => typeof at === 'number' && at > 0))];
-        md.appendMarkdown(`### ${esc(p.title)}${p.plan ? ` · ${esc(p.plan)}` : ''}\n\n`);
-        md.appendMarkdown(`${esc(p.source)}\n\n${text(p.id === 'codex' ? 'source.event' : 'source.fetched')}: ${times.length === 1 ? esc(time(times[0], view.timeZone, i18n)) : times.length ? text('source.multiple') : esc(i18n.unknown())}\n\n`);
-        if (p.error) md.appendMarkdown(`**${text('hover.error', { error: p.error })}**\n\n`);
-        if (p.notice) md.appendMarkdown(`${esc(p.notice)}\n\n`);
-        if (rows.some((r) => r.recordedOnly)) md.appendMarkdown(`${text('source.recordedHint')}\n\n`);
+        const lines = [`**${esc(p.title)}**${p.plan ? ` · ${esc(p.plan)}` : ''}`];
+        if (p.error) lines.push(`⚠️ ${text('hover.error', { error: p.error })}`);
+        if (p.notice) lines.push(esc(p.notice));
         if (p.spend) {
             const money = p.spend;
-            md.appendMarkdown(`**${esc(money.title || t('budget.account'))}**\n\n`);
-            md.appendMarkdown(`${text('hover.spent', { used: amount(money.used, money.currency, i18n), limit: amount(money.limit, money.currency, i18n) })}\n\n`);
-            md.appendMarkdown(`${progress(money.usedPct, i18n)} **${text('hover.budgetUsed', { value: pct(money.usedPct, i18n) })}** · ${text('budget.remaining', { amount: amount(money.remaining, money.currency, i18n) })}\n\n`);
-            md.appendMarkdown(`${money.stale ? `**${text('source.stale')}** · ` : ''}${text('reset.label', { reset: compactReset(money, view.timeZone, view.now, i18n) })}${money.enabled === false ? ' · ' + text('budget.disabled') : ''}\n\n`);
-            if (money.issue) md.appendMarkdown(`**${esc(money.issue)}**\n\n`);
+            const value = left && Number.isFinite(money.usedPct) ? Math.max(0, 100 - money.usedPct) : money.usedPct;
+            const reading = hoverReading(money.title || t('budget.account'), money.usedPct, value, i18n);
+            const funds = amount(left ? money.remaining : money.used, money.currency, i18n);
+            const limit = amount(money.limit, money.currency, i18n);
+            const details = [`${reading} · ${esc(funds)} / ${esc(limit)}`];
+            if (money.resetAt) details.push(esc(compactReset(money, zone, view.now, i18n)));
+            if (money.stale && !money.resetPending) details.push(text('source.stale'));
+            if (money.enabled === false) details.push(text('budget.disabled'));
+            lines.push(details.join(' · '));
+            if (money.issue) lines.push(`⚠️ ${esc(money.issue)}`);
         }
-        if (rows.length) {
-            const grouped = p.id === 'antigravity' || p.groups.some((g) => g.groupType === 'fable');
-            md.appendMarkdown(`| ${grouped ? text('hover.group') + ' | ' : ''}${text('hover.window')} | ${text('hover.usage')} | ${esc(label)} | ${text('hover.resets')} |\n|${grouped ? '---|' : ''}---|---|---|---|\n`);
-            for (const g of p.groups)
-                for (const [index, row] of g.rows.entries()) {
-                    const name = grouped ? `${index === 0 ? `**${esc(g.label)}**` : ''} | ` : '';
-                    md.appendMarkdown(`| ${name}${esc(row.label)}${row.recordedOnly ? ` (${text('source.lastRecorded')})` : row.stale && row.usedPct !== null ? ` (${text('source.stale')})` : ''} | ${progress(row[main], i18n)} | ${esc(pct(row[main], i18n))} (${text('hover.other', { value: pct(row[other], i18n), mode: t(left ? 'quota.used.short' : 'quota.remaining.short') })}) | ${esc(compactReset(row, view.timeZone, view.now, i18n))} |\n`);
-                }
-            md.appendMarkdown('\n');
+        const groups = p.groups.filter((g) => g.rows.length);
+        for (const g of groups) {
+            if (p.id === 'antigravity' || g.groupType === 'fable') lines.push(`**${esc(g.label)}**`);
+            for (const row of g.rows) {
+                const reading = hoverReading(row.label, row.usedPct, row[main], i18n);
+                const freshness = row.recordedOnly ? text('source.lastRecorded')
+                    : row.stale && row.usedPct !== null && !row.resetPending ? text('source.stale') : '';
+                lines.push(`&ensp;${reading} &ensp; ${esc(compactReset(row, zone, view.now, i18n))}${freshness ? ` · ${freshness}` : ''}`);
+            }
         }
-        if (!p.spend && !rows.length) md.appendMarkdown(`${text('quota.empty')}\n\n`);
+        if (!p.spend && !groups.length && !p.error && !p.notice) lines.push(text('quota.empty'));
+        md.appendMarkdown(lines.join('  \n') + '\n\n');
     }
-    md.appendMarkdown(`${text('hover.times', { zone: view.timeZone || 'Asia/Taipei' })}\n\n[${text('hover.open')}](command:${FOCUS})`);
+    md.appendMarkdown(`[${text('hover.open')}](command:${FOCUS}) · ${esc(zone)}`);
     return md;
 }
 class StatusBar {
     constructor() {
         this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
-        this.item.name = 'Nexus AI Usage';
+        this.item.name = 'AI Usage';
         this.item.command = FOCUS;
     }
     update(view, options = {}) {
@@ -124,10 +136,12 @@ class StatusBar {
         const visibleProviders = view.providers.filter((p) => !options.hidden?.includes(p.id))
             .map((p) => selectStatusProvider(p, options.antigravityWindows))
             .filter((p) => p.id !== 'antigravity' || p.groups.length);
-        this.item.text = '$(dashboard) ' + visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')
-            + (visibleProviders.length ? ` · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}` : i18n.t('status.hidden'));
+        const label = visibleProviders.length
+            ? `${visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')} · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}`
+            : i18n.t('status.hidden');
+        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${label}`;
         this.item.tooltip = hover(view);
-        this.item.accessibilityInformation = { label: this.item.text.replace('$(dashboard)', '') };
+        this.item.accessibilityInformation = { label };
         this.item.backgroundColor = visibleProviders.some((p) => p.id === 'codex' ? !!p.error : !!marker(p))
             ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
         if (options.show === false || !visibleProviders.length) this.item.hide();
@@ -135,4 +149,4 @@ class StatusBar {
     }
     dispose() { this.item.dispose(); }
 }
-module.exports = { StatusBar, summary, hover, amount, pct, reset, progress, AG_STATUS_WINDOWS, STATUS_SPACE_NOTE };
+module.exports = { StatusBar, summary, hover, amount, pct, reset, progress, AG_STATUS_WINDOWS };

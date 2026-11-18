@@ -1,10 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-  <line x1="12" y1="12" x2="12" y2="4" stroke="#388bfd" stroke-width="2" stroke-linecap="round"/>
-  <line x1="12" y1="12" x2="5" y2="18" stroke="#388bfd" stroke-width="2" stroke-linecap="round"/>
-  <line x1="12" y1="12" x2="19" y2="18" stroke="#388bfd" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="12" cy="12" r="7" stroke="#262c3c" stroke-width="1.5" stroke-dasharray="3 3"/>
-  <circle cx="12" cy="4" r="2.5" fill="#2ecc71"/>
-  <circle cx="5" cy="18" r="2.5" fill="#58a6ff"/>
-  <circle cx="19" cy="18" r="2.5" fill="#388bfd"/>
-  <circle cx="12" cy="12" r="3.5" fill="#1f6feb" stroke="#58a6ff" stroke-width="1.5"/>
+  <g stroke="#767e8e" stroke-width="2" stroke-linecap="round">
+    <path d="M4.6 17.4a8.4 8.4 0 1 1 14.8 0"/>
+    <path d="M12 13.9l4.4-4.5M9 19.1h6"/>
+    <circle cx="12" cy="13.9" r="1.5" fill="#767e8e" stroke="none"/>
+  </g>
 </svg>

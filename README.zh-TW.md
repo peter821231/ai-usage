@@ -1,4 +1,4 @@
-# Nexus AI Usage（預覽版）
+# AI Usage
 
 [English](README.md) | **繁體中文（台灣）**
 
@@ -10,7 +10,17 @@
 `nexus-ai-usage-local.nexus-ai-usage`，不會取代 Quota Nexus 或移轉其資料。
 這是非官方專案，與 Google、Anthropic 或 OpenAI 均無隸屬關係。
 
-## 介面預覽 — 0.1.6
+## 介面預覽 — 0.1.19
+
+在 **設定 → 狀態列 → 精簡模式** 勾選後，狀態列只顯示一個額度儀表。
+將滑鼠移到圖示上，可查看各群組的額度、燈號、放大的分段進度條和重設時間。
+點一下圖示即可開啟儀表板。
+
+![AI Usage 0.1.19 精簡狀態列及額度預覽，使用 Antigravity、Claude Enterprise 和 Codex 的示範資料](docs/images/v0.1.19-compact-hover-demo.png)
+
+上圖採用示範資料。維護者於 2026-11-18 在 IDE 的繁體中文介面確認放大的分段進度條與精簡模式。
+
+## 舊版介面預覽 — 0.1.6
 
 以下狀態列、儀表板與滑鼠懸停提示的截圖，由維護者於 **2026-11-17** 在 Antigravity IDE 中擷取。
 數值是特定帳戶在當下的紀錄，並非即時讀數，也不代表固定預算。
@@ -22,7 +32,6 @@
 
 預設選取 Gemini **5-hour / Weekly（5 小時／每週）** 及 **Argon Weekly（Argon 每週）**。
 可在設定中加入 Claude/GPT；滑鼠懸停提示與儀表板仍會顯示完整額度。
-狀態列寬度由 IDE 與其他擴充套件共用，請依視窗寬度選擇要顯示的摘要。
 
 ### 詳細儀表板
 
@@ -50,7 +59,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 </details>
 
-圖片來源、畫面中的變更，以及重新產生合成設定預覽的方式，請參閱[預覽來源與介面重點（英文）](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md)。
+圖片來源、畫面中的變更，以及重新產生合成設定預覽的方式，請參閱[預覽來源與介面重點](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md)。
 
 ## 介面語言
 
@@ -80,11 +89,11 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 ## 使用條件與限制
 
-請將 Nexus 安裝在你使用各家官方整合的 IDE。資料來源必須能由同一個擴充套件主機存取。Windows、WSL、SSH 與容器各自有獨立的檔案、程序和登入狀態。例如，用 WSL 開啟的工作區需要在 WSL 主機設定官方整合並產生用量資料。IDE 須支援 VS Code 擴充套件並符合 [`package.json`](package.json) 的版本範圍。
+請將 AI Usage 安裝在你使用各家官方整合的 IDE。資料來源必須能由同一個擴充套件主機存取。Windows、WSL、SSH 與容器各自有獨立的檔案、程序和登入狀態。例如，用 WSL 開啟的工作區需要在 WSL 主機設定官方整合並產生用量資料。IDE 須支援 VS Code 擴充套件並符合 [`package.json`](package.json) 的版本範圍。
 
-| 服務 | Nexus 所在的擴充套件主機需要具備的條件 |
+| 服務 | AI Usage 所在的擴充套件主機需要具備的條件 |
 | --- | --- |
-| Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。Nexus 需要連到可回傳額度的 Antigravity 語言伺服器。 |
+| Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。AI Usage 需要連到可回傳額度的 Antigravity 語言伺服器。 |
 | Claude | 在該 IDE 主機安裝官方 Claude Code 擴充套件（`anthropic.claude-code`），並登入要監看的 Claude 帳戶或 Team 工作區。僅登入 Claude Desktop 的環境不在支援範圍。 |
 | Codex | 在同一主機使用官方 Codex 整合，並讓本機工作階段在預設的 `~/.codex/sessions` 寫入額度限制事件。面板會顯示讀到的最新事件及原始時間。 |
 
@@ -92,7 +101,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 1. 從 [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) 下載 `nexus-ai-usage-<version>.vsix`，或在本機執行 `npm run package`，將套件建置到 `artifacts/`。
 2. 在目標 IDE 執行 **Extensions: Install from VSIX…**，選取下載的檔案。
-3. 在活動列開啟 **Nexus AI Usage**，執行 **Show Diagnostics（顯示診斷資訊）** 檢查本機來源。
+3. 在活動列開啟 **AI Usage**，執行 **Show Diagnostics（顯示診斷資訊）** 檢查本機來源。
 4. 將數值與重設時間和各服務的官方用量頁面比對。服務提供者的快取與查詢間隔可能延遲新讀數。
 
 ## 資料來源、驗證資訊與更新時效
@@ -103,7 +112,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 | Claude | 官方 Claude Code 擴充套件內附的 CLI，或同一主機的官方原生 CLI 備援 | 約每五分鐘查詢一次。手動查詢至少間隔一分鐘，失敗後會逐步延長重試間隔。讀數超過十分鐘會標示為過時。同一主機的多個視窗共用查詢租約與快取。 |
 | Codex | 本機 `~/.codex/sessions` 記錄檔中的額度限制事件 | 約每分鐘檢查一次；舊事件以中性樣式標示 **Last recorded（最近記錄）**，保留真實時間戳記與數值。讀取錯誤仍會警示。其他裝置可能有較新的用量。 |
 
-若 Claude Code 擴充套件內附的 CLI 無法啟動，Nexus 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
+若 Claude Code 擴充套件內附的 CLI 無法啟動，AI Usage 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
 
 監看工具不會讀取 Claude 憑證檔案，也不會要求提供權杖或 Cookie。
 身分驗證由官方 CLI 處理。工具會在擴充套件自己的儲存資料夾中，使用 `initialize` 與 `get_usage` 查詢，
@@ -156,7 +165,7 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 
 ## 命令與設定
 
-以下命令皆位於 **Nexus AI Usage** 類別下：
+以下命令皆位於 **AI Usage** 類別下：
 
 - **Refresh Usage**：重新整理用量。
 - **Quick Settings**：快速設定。
@@ -173,6 +182,7 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 - `refresh.pauseWhenUnfocused`：在背景時暫停定期檢查。
 - `context.show`：可選的對話脈絡區塊，預設關閉。
 - `statusBar.show`，以及各服務的 `enable` 與 `showInStatusBar`。未設定 `showInStatusBar` 時，讀到額度或支出資料後，該服務會自動顯示。手動設定優先。
+- `statusBar.compact`：只顯示額度儀表圖示，預設關閉。
 - `antigravity.statusBar.*` 下的 `geminiFiveHour`、`geminiWeekly`、`argonWeekly` 預設開啟；`claudeGptFiveHour`、`claudeGptWeekly` 預設關閉。
 - `claudeCode.timeoutSeconds`：15、30、45（預設）或 60 秒。
 - `claudeCode.enterpriseResetSchedule`：`monthlyUtc`（已驗證的每月 UTC 規則）或 `unknown`（僅採用來源）。依規則推算的日期會明確標示。
@@ -184,7 +194,7 @@ Antigravity 摘要會顯示所選週期名稱，包含數值為 Unknown 的項�
 
 狀態列空間由 IDE 與其他擴充套件共用，能顯示多少內容取決於寬度、字型／縮放比例及其他項目。
 此擴充套件不宣稱有固定的字元數上限，也不會默默截斷數值。請選擇需要的摘要。
-懸停提示與儀表板設定會明確說明，狀態列僅顯示部分資訊。
+懸停提示會為每筆額度顯示燈號、分段進度條、百分比和重設時間。已使用 75% 時轉黃、90% 時轉紅，未知讀值標為白色。
 完整設定及 Codex 舊記錄與讀取失敗的差異，請參閱 [0.1.6 狀態列選項（英文）](docs/status-bar-0.1.6.md)。
 
 Codex 的 **Last recorded** 描述的是本機舊事件，不代表剛成功完成即時查詢。

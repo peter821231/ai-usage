@@ -1,6 +1,6 @@
 # Sources and licenses
 
-Nexus AI Usage is derived from Quota Nexus, commit
+AI Usage is derived from Quota Nexus, commit
 `4e229eb0330ca939086f14d288e04b04e5d40d54` (source package 1.2.8).
 The root LICENSE preserves Copyright (c) 2026 Quota Nexus and the MIT license.
 Selected behavior was compared with Open VSX 1.2.10; this is an independently
