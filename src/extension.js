@@ -7,7 +7,7 @@ const cfg = require('./config');
 const { AgyClient } = require('./agyClient');
 const { CodexReader } = require('./codex');
 const { ClaudeContextReader } = require('./claudeCode');
-const { bundledCliPath, fetchUsage, UsageCliError } = require('./claudeUsageCli');
+const { bundledCliPath, nativeCliPath, fetchHostUsage } = require('./claudeUsageCli');
 const { parseUsage } = require('./claudeUsage');
 const { refreshClaude } = require('./claudeUsageStore');
 const { buildUsageState } = require('./usageState');
@@ -142,17 +142,13 @@ class Monitor {
                 storageDir,
                 force,
                 signal: this.abort.signal,
-                query: async (signal) => {
-                    if (!official) throw new UsageCliError('cli-unavailable');
-                    return parseUsage(
-                        await fetchUsage({
-                            command: bundledCliPath(official.extensionPath),
-                            cwd: storageDir,
-                            timeoutMs: cfg.get('claudeCode.timeoutSeconds', 45) * 1000,
-                            signal
-                        })
-                    );
-                }
+                query: async (signal) => parseUsage(await fetchHostUsage({
+                    extensionPath: official?.extensionPath,
+                    home: this.home,
+                    cwd: storageDir,
+                    timeoutMs: cfg.get('claudeCode.timeoutSeconds', 45) * 1000,
+                    signal
+                }))
             });
             if (result) {
                 s.data = result.data;
@@ -214,6 +210,7 @@ class Monitor {
             extensionVersion: this.context.extension.packageJSON.version,
             officialClaudeVersion: official?.packageJSON.version || null,
             officialCliPresent: !!official && fs.existsSync(bundledCliPath(official.extensionPath)),
+            nativeCliPresent: fs.existsSync(nativeCliPath(this.home)),
             codexLogsPresent: fs.existsSync(path.join(this.home, '.codex', 'sessions')),
             antigravityConnected: !!this.agy.server,
             sources: Object.fromEntries(

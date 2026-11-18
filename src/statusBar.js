@@ -49,12 +49,16 @@ function marker(provider) {
     return rows.some((r) => r.usedPct === null) && (!provider.spend || provider.primaryMetric === 'quota') ? ' ?' : '';
 }
 function summary(provider, mode, i18n = english) {
-    if (provider.id === 'claude' && provider.spend && provider.primaryMetric !== 'quota')
-        return `Claude ${amount(provider.spend.used, provider.spend.currency, i18n)} / ${provider.spend.limit === null ? i18n.unknown() : i18n.number(provider.spend.limit, { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })}${marker(provider)}`;
-    const values = provider.groups.map((g) =>
-        `${provider.id === 'antigravity' ? g.short + ' ' : ''}${g.rows.map((r) => `${i18n.windowLabel(r, true)} ${pct(mode === 'left' ? r.remainingPct : r.usedPct, i18n)}`).join(' · ')}`
-    ).filter(Boolean).join(' · ');
-    return `${provider.id === 'antigravity' ? 'AG' : provider.id === 'codex' ? 'Codex' : 'Claude'} ${values || i18n.unknown()}${marker(provider)}`;
+    const spend = provider.id === 'claude' && provider.primaryMetric !== 'quota' ? provider.spend : null;
+    const values = spend ? [
+        `${amount(spend.used, spend.currency, i18n)} / ${spend.limit === null ? i18n.unknown() : i18n.number(spend.limit, { useGrouping: false, minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ] : [];
+    for (const g of provider.groups) {
+        if (!g.rows.length || (spend && g.groupType !== 'fable')) continue;
+        const prefix = provider.id === 'antigravity' || g.groupType === 'fable' ? `${g.short} ` : '';
+        values.push(prefix + g.rows.map((r) => `${i18n.windowLabel(r, true)} ${pct(mode === 'left' ? r.remainingPct : r.usedPct, i18n)}`).join(' · '));
+    }
+    return `${provider.id === 'antigravity' ? 'AG' : provider.id === 'codex' ? 'Codex' : 'Claude'} ${values.join(' · ') || i18n.unknown()}${marker(provider)}`;
 }
 function progress(value, i18n = english) {
     return typeof value === 'number' && Number.isFinite(value) ? `\`${textBar(value, 12)}\`` : i18n.unknown();
@@ -95,7 +99,7 @@ function hover(view) {
             if (money.issue) md.appendMarkdown(`**${esc(money.issue)}**\n\n`);
         }
         if (rows.length) {
-            const grouped = p.id === 'antigravity';
+            const grouped = p.id === 'antigravity' || p.groups.some((g) => g.groupType === 'fable');
             md.appendMarkdown(`| ${grouped ? text('hover.group') + ' | ' : ''}${text('hover.window')} | ${text('hover.usage')} | ${esc(label)} | ${text('hover.resets')} |\n|${grouped ? '---|' : ''}---|---|---|---|\n`);
             for (const g of p.groups)
                 for (const [index, row] of g.rows.entries()) {

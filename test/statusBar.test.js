@@ -112,6 +112,34 @@ test('status bar keeps Argon and window names distinct and money separate from c
     assert.match(items[0].tooltip.value, /`[█░]+`/);
 });
 
+test('status bar and hover distinguish Fable from the all-models weekly window', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const state = buildUsageState({
+        antigravity: { enabled: false },
+        codex: { enabled: false },
+        claude: { data: parseUsage({ subscription_type: 'team', rate_limits: {
+            five_hour: { utilization: 13 },
+            seven_day: { utilization: 3 },
+            model_scoped: [{ display_name: 'Fable', utilization: 5 }]
+        } }, now) }
+    }, now);
+    bar.update(state);
+    assert.match(items[0].text, /Claude 5h 13% · wk 3% · Fable wk 5%/);
+    assert.match(items[0].tooltip.value, /\*\*Fable\*\* \| Weekly/);
+
+    const enterprise = buildUsageState({
+        antigravity: { enabled: false },
+        codex: { enabled: false },
+        claude: { data: parseUsage({ subscription_type: 'enterprise', rate_limits: {
+            extra_usage: extraUsage,
+            model_scoped: [{ display_name: 'Fable', utilization: 5 }]
+        } }, now) }
+    }, now);
+    bar.update(enterprise);
+    assert.match(items[0].text, /Claude USD 3.21 \/ 50.00 · Fable wk 5%/);
+});
+
 test('Antigravity selections change only the summary; all windows remain in hover and the original view', () => {
     const { StatusBar, items } = load();
     const bar = new StatusBar();

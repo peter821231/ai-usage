@@ -99,3 +99,45 @@ test('partial personal responses keep core windows Unknown without inventing mod
     const unavailable = render({ subscription_type: 'pro', rate_limits_available: false });
     assert.equal(unavailable.groups[0].rows.length, 0);
 });
+
+test('Team displays source-provided session, all-model and Fable limits in either CLI format', () => {
+    const projected = {
+        five_hour: { utilization: 13, resets_at: sessionReset },
+        seven_day: { utilization: 3, resets_at: weeklyReset },
+        model_scoped: [{ display_name: 'Fable', utilization: 5, resets_at: weeklyReset }]
+    };
+    const limits = [
+        { kind: 'session', percent: 13, resets_at: sessionReset },
+        { kind: 'weekly_all', percent: 3, resets_at: weeklyReset },
+        { kind: 'weekly_scoped', percent: 5, resets_at: weeklyReset, scope: { model: { display_name: 'Fable' } } }
+    ];
+    for (const rate_limits of [projected, { ...projected, limits }, { limits }, { ...projected, limits: [limits[2]] }]) {
+        const view = render({ subscription_type: 'team', rate_limits });
+        assert.equal(view.primaryMetric, 'quota');
+        assert.equal(view.spend, null);
+        assert.deepEqual(view.groups[0].rows.map((row) => [row.label, row.usedPct, row.resetAt]), [
+            ['5-hour', 13, new Date(sessionReset).toISOString()],
+            ['Weekly', 3, new Date(weeklyReset).toISOString()]
+        ]);
+        assert.equal(view.groups[1].label, 'Fable');
+        assert.deepEqual(view.groups[1].rows.map((row) => [row.label, row.usedPct, row.resetAt]), [
+            ['Weekly', 5, new Date(weeklyReset).toISOString()]
+        ]);
+    }
+    const partial = render({ subscription_type: 'team', rate_limits: { model_scoped: projected.model_scoped } });
+    assert.deepEqual(partial.groups[0].rows.map((row) => [row.label, row.usedPct]), [
+        ['5-hour', null],
+        ['Weekly', null]
+    ]);
+    assert.equal(partial.groups[1].rows[0].usedPct, 5);
+
+    const versioned = render({ rate_limits: { model_scoped: [
+        { display_name: 'Claude Fable 5.2', utilization: 0 },
+        { display_name: 'Sonnet', utilization: 3 }
+    ] } });
+    assert.equal(versioned.groups[0].rows[0].label, 'Weekly · Sonnet');
+    assert.equal(versioned.groups[1].rows[0].label, 'Weekly · 5.2');
+    assert.equal(versioned.groups[1].rows[0].usedPct, 0);
+    assert.equal(render(personalUsage('pro', 'legacy')).groups.length, 1);
+    assert.equal(render({ subscription_type: 'enterprise', rate_limits: { extra_usage: extraUsage } }).groups.length, 1);
+});

@@ -2,7 +2,7 @@
 
 [English](README.md) | **繁體中文（台灣）**
 
-在本機監看 Antigravity、Claude 個人訂閱額度、Enterprise 帳戶支出及 Codex 用量的工具。
+在本機監看 Antigravity、Claude 訂閱額度、Enterprise 帳戶支出及 Codex 用量的工具。
 本專案衍生自 [Quota Nexus](https://github.com/praveen2git/quota-nexus)，Claude 用量查詢程式碼則改寫自 Claude Usage Ultra。
 詳見 [LICENSE](LICENSE) 與 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
 
@@ -66,7 +66,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 ## 功能
 
 - **Antigravity**：Gemini Models 的 5 小時及每週額度、Claude 與 GPT 模型的 5 小時及每週額度，以及 Gemini 4 Argon 的每週額度。即使用量百分比與重設時間相同，也會保留完整的群組識別資訊。
-- **Claude Pro / Max**：顯示來源提供的 5 小時、每週及個別模型額度，各自保有重設時間。即使啟用額外用量，狀態列、展開卡片及收合預覽仍以訂閱額度為主。額外支出放在獨立的預算區塊；缺少的數值維持 **Unknown（未知）**。
+- **Claude Pro / Max 與 Team（合成資料測試）**：顯示來源提供的 5 小時、每週及個別模型額度，各自保有重設時間。即使啟用額外用量，狀態列、展開卡片及收合預覽仍以訂閱額度為主。額外支出放在獨立的預算區塊；缺少的數值維持 **Unknown（未知）**。
 - **Claude Enterprise**：透過已安裝的官方 Claude Code CLI，取得實際帳戶支出、來源提供的上限、剩餘金額及預算使用百分比。上限不會寫死為 200 美元。畫面描述的是帳戶用量，不宣稱這是一份僅計算 Claude Code 的獨立帳單。
 - **Codex**：從本機工作階段記錄檔讀取 5 小時與每週的額度限制事件，保留事件原始時間。重新讀取記錄檔不會讓資料變成最新。
 - 精簡的 AG / CC / CX 服務卡片，內含額度長條圖與重設倒數；卡片可收合，並在重新整理或重新載入網頁檢視後保留收合狀態。縮小標頭留白、列高與區塊間距，讓側邊欄能顯示更多用量，同時保留額度標籤、重設資訊，以及分開呈現的預算與對話脈絡。完整來源時間與確切重設時間，仍可在各卡片的 **Source & reset details（來源與重設詳細資訊）** 中展開檢視。模型標籤與 Antigravity 內部點數欄位無須額外查詢即可讀取；點數欄位的意義與尺度尚未和官方用量介面核對，不能視為已確認的可用額度。
@@ -78,27 +78,32 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 此版本未啟用帳戶切換、登入流程、其他服務提供者、雲端服務、遙測、用量消耗速度預測或通知。
 
+## 使用條件與限制
+
+請將 Nexus 安裝在你使用各家官方整合的 IDE。資料來源必須能由同一個擴充套件主機存取。Windows、WSL、SSH 與容器各自有獨立的檔案、程序和登入狀態。例如，用 WSL 開啟的工作區需要在 WSL 主機設定官方整合並產生用量資料。IDE 須支援 VS Code 擴充套件並符合 [`package.json`](package.json) 的版本範圍。
+
+| 服務 | Nexus 所在的擴充套件主機需要具備的條件 |
+| --- | --- |
+| Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。Nexus 需要連到可回傳額度的 Antigravity 語言伺服器。 |
+| Claude | 在該 IDE 主機安裝官方 Claude Code 擴充套件（`anthropic.claude-code`），並登入要監看的 Claude 帳戶或 Team 工作區。僅登入 Claude Desktop 的環境不在支援範圍。 |
+| Codex | 在同一主機使用官方 Codex 整合，並讓本機工作階段在預設的 `~/.codex/sessions` 寫入額度限制事件。面板會顯示讀到的最新事件及原始時間。 |
+
 ## 安裝與比對
 
-1. 保留目前已安裝的 Quota Nexus 與 Claude Usage Ultra。
-2. 從 [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) 下載 `nexus-ai-usage-<version>.vsix`，或在本機執行 `npm run package`，將套件建置到 `artifacts/`。
-3. 在目標 IDE 執行 **Extensions: Install from VSIX…**，選取下載的 `.vsix` 檔案。
-4. 在已驗證的 Windows + WSL 環境中，請將預覽版安裝並執行於 WSL 擴充套件主機；官方 Claude 擴充套件與其他資料來源是在該主機找到的。執行 **Nexus AI Usage: Show Diagnostics** 檢查來源是否可用。
-5. 在活動列開啟 **Nexus AI Usage**，將數值與重設時間和各服務的官方用量頁面比對。即使剛發出查詢，仍可能受到服務提供者快取或監看工具查詢間隔的影響。
-6. 最後驗證僅使用一個監看工具時，請暫時停用原本的 Nexus 與 Ultra，先不要解除安裝。若預覽版比對未通過，請恢復原工具；確認可接受替代結果後，再移除舊工具。
-
-資料來源必須能由執行預覽版的擴充套件主機存取。
-此版本不會跨 Windows、WSL、SSH 或容器主機串接資料來源。
-程式已支援 Windows 與 macOS 原生執行所需的來源路徑，但尚未以使用者帳戶測試。
-VS Code 核心版本需求記載於 `package.json`；成功安裝不代表所有來源都可用。
+1. 從 [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) 下載 `nexus-ai-usage-<version>.vsix`，或在本機執行 `npm run package`，將套件建置到 `artifacts/`。
+2. 在目標 IDE 執行 **Extensions: Install from VSIX…**，選取下載的檔案。
+3. 在活動列開啟 **Nexus AI Usage**，執行 **Show Diagnostics（顯示診斷資訊）** 檢查本機來源。
+4. 將數值與重設時間和各服務的官方用量頁面比對。服務提供者的快取與查詢間隔可能延遲新讀數。
 
 ## 資料來源、驗證資訊與更新時效
 
 | 服務 | 來源 | 更新時效 |
 | --- | --- | --- |
 | Antigravity | 本機回送位址上的額度摘要；沿用既有的程序探索方式與本機工作階段權杖 | 約每分鐘檢查一次；摘要查詢快取兩分鐘。超過五分鐘未成功取得摘要即標示為過時。時間標示為 **Fetched（擷取時間）**，並非後端事件時間戳記。 |
-| Claude | 官方 `anthropic.claude-code` 擴充套件內附的原生 CLI | 約每五分鐘查詢一次；手動查詢至少間隔一分鐘，並遵守失敗後逐步延長重試間隔的機制。超過十分鐘即標示為過時。同一主機中的多個視窗共用查詢租約與快取，以協調查詢。 |
+| Claude | 官方 Claude Code 擴充套件內附的 CLI，或同一主機的官方原生 CLI 備援 | 約每五分鐘查詢一次。手動查詢至少間隔一分鐘，失敗後會逐步延長重試間隔。讀數超過十分鐘會標示為過時。同一主機的多個視窗共用查詢租約與快取。 |
 | Codex | 本機 `~/.codex/sessions` 記錄檔中的額度限制事件 | 約每分鐘檢查一次；舊事件以中性樣式標示 **Last recorded（最近記錄）**，保留真實時間戳記與數值。讀取錯誤仍會警示。其他裝置可能有較新的用量。 |
+
+若 Claude Code 擴充套件內附的 CLI 無法啟動，Nexus 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
 
 監看工具不會讀取 Claude 憑證檔案，也不會要求提供權杖或 Cookie。
 身分驗證由官方 CLI 處理。工具會在擴充套件自己的儲存資料夾中，使用 `initialize` 與 `get_usage` 查詢，
@@ -133,22 +138,21 @@ Antigravity 程序探索會存取記憶體中的本機工作階段權杖；
 例如，十一月的舊讀數在十二月一日過後，仍指向十二月一日，並標示為過時／待更新；
 不會默默推進到一月，也不會把支出改成零。必須重新查詢來源，才能取得下一個週期的實際支出。
 
-## Claude 個人訂閱
+## Claude Pro / Max 與 Team 訂閱
 
-相同的官方 CLI 查詢也能讀取 Pro / Max 用量，不需要切換帳戶或新增驗證資訊。
-同時支援舊版 `five_hour` / `seven_day*` 回應，以及新版帶有模型適用範圍的 `limits` 清單。
+監看工具會使用官方 Claude Code CLI 目前登入的帳戶。
+解析器支援 `five_hour` / `seven_day*`、`limits`，以及 `model_scoped` 清單中的個別模型每週額度。CLI 回報獨立的 Fable 每週額度時，儀表板會在獨立區塊顯示其百分比與重設時間，收合卡片與狀態列也會顯示 Fable。
 來源提供的資料列若缺少百分比或百分比無效，仍會顯示為 **Unknown**，與 0% 區分。
 僅顯示來源回傳的個別模型額度週期，不會替個人訂閱虛構模型額度或 200 美元預算。
-若辨識為 Pro / Max 方案，但缺少主要的 5-hour / Weekly 額度，會顯示為 **Unknown**；
+若辨識為 Pro / Max 或 Team 方案，但缺少主要的 5-hour / Weekly 額度，會顯示為 **Unknown**；
 個別模型週期則只有在來源回報時才加入。
 
 個人訂閱的重設時間一律來自來源。Enterprise 每月設定不會替個人額度或額外支出指定重設時間。
 可選的額外用量會與訂閱百分比及 Context（對話脈絡）分開呈現；
 即使金額格式不受支援，仍會顯示有效的額度資料列。
 
-Pro / Max 相容性已透過合成通訊協定測試資料與瀏覽器檢查驗證，涵蓋無額外用量、額外用量受支援及不受支援等情況。
-目前尚未與已登入的 Pro / Max 帳戶實際比對。
-這些測試不代表每個 CLI 版本或個人帳戶都會提供每一種額度週期。
+合成回應測試涵蓋 Pro / Max 的額外用量，以及 Team 的工作階段、每週所有模型和每週 Fable 額度。
+Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 
 ## 命令與設定
 

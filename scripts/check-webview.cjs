@@ -202,6 +202,8 @@ const server = http.createServer((req, res) => {
     if (await codexCard.locator('.stale-dot, .row-stale').count())
         throw Error('Normal recorded Codex data should not show an amber stale indicator');
     if ((await page.locator('.money').textContent()) !== 'USD 35.14 / USD 200.00') throw Error('Money mismatch');
+    if (await page.locator('[data-provider="claude"]').getByRole('heading', { name: 'Fable', exact: true }).count())
+        throw Error('An Enterprise spend-only response should have no Fable group');
     if (!(await page.locator('.reset-policy').textContent()).includes('00:00 UTC'))
         throw Error('Reset rule basis missing');
     if (!(await page.locator('.budget-reset').getAttribute('title')).includes('1 Dec 2026, 08:00'))
@@ -417,10 +419,43 @@ const server = http.createServer((req, res) => {
     if (!(await page.locator('body').innerText()).includes('Unknown')) throw Error('Missing data hidden');
     if (await page.locator('.quota .meter .fill').count()) throw Error('Unknown readings rendered as zero bars');
 
-    // Drive the same setting message and state update used by an English editor.
     const sendState = (value) => page.evaluate(
         (s) => window.dispatchEvent(new MessageEvent('message', { data: { type: 'state', state: s } })), value
     );
+    const team = buildUsageState({ claude: { data: parseUsage({
+        subscription_type: 'team', rate_limits: {
+            five_hour: { utilization: 13 },
+            seven_day: { utilization: 3 },
+            model_scoped: [{ display_name: 'Fable', utilization: 5, resets_at: future }]
+        }
+    }, now) } }, now);
+    await sendState(team);
+    const claudeCard = page.locator('[data-provider="claude"]');
+    const fable = claudeCard.locator('.group').filter({ has: page.getByRole('heading', { name: 'Fable', exact: true }) });
+    if (await fable.locator('.quota').count() !== 1 || await fable.locator('.value').textContent() !== '5%')
+        throw Error('Fable should have its own weekly section and percentage');
+    if (await claudeCard.locator('.group').first().locator('.quota').count() !== 2)
+        throw Error('Fable should be separate from the common quota windows');
+    if (!(await fable.locator('.reset').getAttribute('title')).includes('22 Nov 2026, 08:00'))
+        throw Error('Fable should show its CLI reset timestamp');
+    await claudeCard.getByRole('button', { name: 'Collapse Claude Code' }).click();
+    if (!(await claudeCard.locator('.card-preview').textContent()).includes('Fable wk'))
+        throw Error('Fable must be identified in the collapsed view');
+    await claudeCard.getByRole('button', { name: 'Expand Claude Code' }).click();
+    const enterpriseWithFable = buildUsageState({ claude: { data: parseUsage({
+        subscription_type: 'enterprise', rate_limits: {
+            spend: { used: money(3514), limit: money(20000), enabled: true },
+            model_scoped: [{ display_name: 'Fable', utilization: 5, resets_at: future }]
+        }
+    }, now) } }, now);
+    await sendState(enterpriseWithFable);
+    await claudeCard.getByRole('button', { name: 'Collapse Claude Enterprise' }).click();
+    const enterprisePreview = await claudeCard.locator('.card-preview').textContent();
+    if (!enterprisePreview.includes('USD 35.14') || !enterprisePreview.includes('Fable wk'))
+        throw Error('Enterprise with a Fable reading should show both spend and Fable in the collapsed preview');
+    await claudeCard.getByRole('button', { name: 'Expand Claude Enterprise' }).click();
+
+    // Drive the same setting message and state update used by an English editor.
     await sendState(state);
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.locator('[data-provider="antigravity"] .source-details summary').click();

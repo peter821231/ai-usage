@@ -2,7 +2,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseUsage, resetTime } = require('../src/claudeUsage');
-const { fetchUsage, bundledCliPath } = require('../src/claudeUsageCli');
+const { fetchUsage, fetchHostUsage, bundledCliPath, nativeCliPath } = require('../src/claudeUsageCli');
+const fs = require('node:fs/promises');
+const os = require('node:os');
 const path = require('node:path');
 
 const m = (amount_minor, extra = {}) => ({
@@ -113,7 +115,39 @@ test('CLI initializes before querying usage and handles segmented output', async
     assert.equal((await fake('ok')).rate_limits.five_hour.utilization, 0);
     assert.equal((await fake('chunks')).rate_limits.five_hour.utilization, 0);
     assert.match(bundledCliPath('/extension', 'win32'), /claude.exe$/);
+    assert.equal(nativeCliPath('/user', 'win32'), path.join('/user', '.local', 'bin', 'claude.exe'));
 });
+
+test('same-host native Claude CLI works with no official extension or a missing bundled binary', {
+    skip: process.platform === 'win32'
+}, async (t) => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'nexus-claude-'));
+    t.after(() => fs.rm(home, { recursive: true, force: true }));
+    const launcher = 'exec "$NEXUS_TEST_NODE" "$NEXUS_TEST_CLAUDE" "$@"\n';
+    const bin = path.join(home, '.local', 'bin');
+    await fs.mkdir(bin, { recursive: true });
+    await fs.writeFile(path.join(bin, 'claude'), `#!/bin/sh\n${launcher}`, { mode: 0o700 });
+    const options = {
+        home,
+        cwd: home,
+        env: {
+            ...process.env,
+            NEXUS_FAKE_CLI: 'ok',
+            NEXUS_TEST_NODE: process.execPath,
+            NEXUS_TEST_CLAUDE: path.join(__dirname, 'fixtures', 'fake-claude.cjs')
+        },
+        timeoutMs: 1500
+    };
+    const extensionPath = path.join(home, 'official-extension');
+    for (const raw of [await fetchHostUsage(options), await fetchHostUsage({ ...options, extensionPath })])
+        assert.equal(parseUsage(raw).windows[0].usedPct, 0);
+
+    const bundled = bundledCliPath(extensionPath);
+    await fs.mkdir(path.dirname(bundled), { recursive: true });
+    await fs.writeFile(bundled, `#!/bin/sh\nexport NEXUS_FAKE_CLI=refuse\n${launcher}`, { mode: 0o700 });
+    await assert.rejects(fetchHostUsage({ ...options, extensionPath }), { code: 'request-refused' });
+});
+
 test('CLI cleans up timeout, exit, cancellation and oversized output with sanitized errors', async () => {
     await assert.rejects(fake('hang', { timeoutMs: 100 }), { code: 'timeout' });
     await assert.rejects(fake('wrong-id', { timeoutMs: 100 }), {

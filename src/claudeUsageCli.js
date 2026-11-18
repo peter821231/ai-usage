@@ -12,8 +12,27 @@ class UsageCliError extends Error {
     constructor(code) { super(code); this.code = code; }
 }
 
+function cliName(platform) {
+    return platform === 'win32' ? 'claude.exe' : 'claude';
+}
+
 function bundledCliPath(extensionPath, platform = process.platform) {
-    return path.join(extensionPath, 'resources', 'native-binary', platform === 'win32' ? 'claude.exe' : 'claude');
+    return path.join(extensionPath, 'resources', 'native-binary', cliName(platform));
+}
+
+function nativeCliPath(home, platform = process.platform) {
+    return path.join(home, '.local', 'bin', cliName(platform));
+}
+
+async function fetchHostUsage({ extensionPath, home, ...options }) {
+    if (extensionPath) {
+        try {
+            return await fetchUsage({ ...options, command: bundledCliPath(extensionPath) });
+        } catch (error) {
+            if (error.code !== 'cli-unavailable') throw error;
+        }
+    }
+    return fetchUsage({ ...options, command: nativeCliPath(home) });
 }
 
 // No user turns are sent. Never log raw output: initialize can include private metadata.
@@ -88,4 +107,4 @@ function fetchUsage({ command, argsPrefix = [], cwd, env, signal, timeoutMs = 45
     });
 }
 
-module.exports = { fetchUsage, bundledCliPath, UsageCliError, CLI_ARGS };
+module.exports = { fetchUsage, fetchHostUsage, bundledCliPath, nativeCliPath, CLI_ARGS };

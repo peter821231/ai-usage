@@ -2,7 +2,7 @@
 
 **English** | [繁體中文（台灣）](README.zh-TW.md)
 
-A local quota monitor for Antigravity, Claude personal subscription quotas,
+A local quota monitor for Antigravity, Claude subscription quotas,
 Enterprise account spend, and Codex.
 Derived from [Quota Nexus](https://github.com/praveen2git/quota-nexus), with Claude
 usage-query code adapted from Claude Usage Ultra. See [LICENSE](LICENSE) and
@@ -77,7 +77,7 @@ generate a template and add another language.
 - **Antigravity:** Gemini Models 5-hour and weekly; Claude and GPT models 5-hour
   and weekly; Gemini 4 Argon weekly. Full group identity is preserved even when
   percentages and reset times happen to match.
-- **Claude Pro / Max:** source-provided 5-hour, weekly and model-scoped quotas
+- **Claude Pro / Max and Team (fixture-tested):** source-provided 5-hour, weekly and model-scoped quotas
   with their own resets. Subscription quotas stay primary in the status bar,
   expanded card and collapsed preview, even with extra usage enabled. Additional
   spending is a separate budget section; missing values stay **Unknown**.
@@ -113,34 +113,40 @@ generate a template and add another language.
 No account switching, sign-in flow, additional providers, cloud service,
 telemetry, burn-rate prediction or notifications are enabled in this version.
 
+## Requirements and limits
+
+Install Nexus in the IDE where you use the providers' official integrations.
+Each source must be reachable from the same extension host as Nexus. Windows,
+WSL, SSH and containers each have their own files, processes and sign-in state.
+For example, a WSL workspace needs the integrations and data in its WSL host.
+The IDE must support VS Code extensions and satisfy the version range in
+[`package.json`](package.json).
+
+| Provider | Requirements in the Nexus extension host |
+|---|---|
+| Antigravity | Run and sign in to Antigravity IDE or its official editor integration. Nexus needs a reachable Antigravity language server that can return quota data. |
+| Claude | Install the official Claude Code extension (`anthropic.claude-code`) in the IDE host and sign in to the Claude account or Team workspace you want to monitor. Standalone Claude Desktop sign-in is outside the supported setup. |
+| Codex | Use the official Codex integration in the host. An eligible local session must write a rate-limit event under the default `~/.codex/sessions` directory. The dashboard shows the most recent event it finds, with its original time. |
+
 ## Install and compare
 
-1. Keep your current Quota Nexus and Claude Usage Ultra installed.
-2. Download `nexus-ai-usage-<version>.vsix` from [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) (or build locally with `npm run package` into `artifacts/`).
-3. In the target IDE, use **Extensions: Install from VSIX…** and select the downloaded `.vsix` file.
-4. For the checked Windows + WSL environment, install/run the preview in the WSL
-   extension host, where the official Claude extension and the other sources
-   were found. Run **Nexus AI Usage: Show Diagnostics** to check availability.
-5. Open **Nexus AI Usage** in the Activity Bar. Compare its values and reset times
-   with the providers' official usage views. A fresh query can still be subject
-   to a provider cache or the monitor's query interval.
-6. For the final single-monitor check, temporarily disable the original Nexus
-   and Ultra without uninstalling them. Restore them if the preview does not
-   pass comparison. Only remove them after the replacement is accepted.
-
-The sources must be reachable from the extension host that runs this preview.
-This version does not bridge Windows, WSL, SSH or container hosts. Windows and
-macOS native execution are supported by source paths but have not been tested
-on the user's account. VS Code core requirement is declared in `package.json`;
-installation alone is not proof that all sources are available.
+1. Download `nexus-ai-usage-<version>.vsix` from [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) or build it with `npm run package` into `artifacts/`.
+2. In the target IDE, run **Extensions: Install from VSIX…** and select the file.
+3. Open **Nexus AI Usage** in the Activity Bar and run **Show Diagnostics** to check the local sources.
+4. Compare values and reset times with each provider's official Usage view. Provider caches and the query interval can delay new readings.
 
 ## Sources, credentials and freshness
 
 | Provider | Source | Freshness |
 |---|---|---|
 | Antigravity | Local loopback quota summary; existing process discovery and local session token | Check about once a minute; summary queries are cached for two minutes. Mark stale after five minutes without a successful summary. Time is labelled **Fetched**, not a backend event timestamp. |
-| Claude | Official `anthropic.claude-code` extension's bundled native CLI | Query about every five minutes; manual requests are at least a minute apart and respect failure backoff. Mark stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
+| Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
 | Codex | Rate-limit events in local `~/.codex/sessions` logs | Check about once a minute; old events are labelled **Last recorded** in neutral styling, retaining their real timestamps and values. Read errors still warn. Other devices may have newer usage. |
+
+If the bundled Claude Code CLI cannot start, Nexus can try the official native
+install location in the same host (`~/.local/bin/claude` on macOS/Linux or
+`%USERPROFILE%\.local\bin\claude.exe` on Windows). **Diagnostics** reports the
+presence of both executables. See [Claude Code installation troubleshooting](https://code.claude.com/docs/en/troubleshoot-install).
 
 The monitor does not read Claude credential files or request tokens/Cookies.
 The official CLI owns authentication. It is queried with `initialize` and
@@ -185,15 +191,17 @@ still points to December 1 after that boundary passes and becomes stale/pending;
 it does not silently advance to January or change spend to zero. A new source
 query is needed to observe the next period's actual spend.
 
-## Personal Claude subscriptions
+## Claude Pro / Max and Team subscriptions
 
-The same official CLI query reads Pro / Max usage; no account switching or new
-credentials are needed. Both the legacy `five_hour` / `seven_day*` response and
-the newer `limits` list with model scope are supported. Source-provided rows with
+The monitor uses the account signed in to the official Claude Code CLI. The
+parser handles `five_hour` / `seven_day*`, `limits`, and the `model_scoped` list
+of weekly model limits. The dashboard, collapsed card and status bar show Fable
+when the CLI reports a distinct weekly Fable limit. The dashboard shows its
+source-provided percentage and reset. Source-provided rows with
 missing or invalid percentages remain visible as **Unknown**, distinct from 0%.
 Only returned model-specific windows are shown; the monitor does not invent a
 model quota or a USD 200 budget for a personal subscription.
-Missing core 5-hour / Weekly windows for a recognized Pro / Max plan are shown
+Missing core 5-hour / Weekly windows for a recognized Pro / Max or Team plan are shown
 as **Unknown**; model-specific windows are added only when the source reports them.
 
 Personal subscription resets always come from the source. The Enterprise monthly
@@ -201,10 +209,9 @@ setting does not assign resets to personal quotas or extra spending. Optional
 extra usage remains separate from subscription percentages and Context; an
 unsupported money format does not prevent valid quota rows from displaying.
 
-Pro / Max compatibility is covered by artificial protocol fixtures and browser
-checks with extra usage absent, supported or unsupported. It has not yet been
-compared with a signed-in Pro / Max account. These tests do not claim that every
-CLI version or personal account exposes every window.
+Synthetic responses cover Pro / Max with or without extra usage, and Team with
+session, weekly all-model, and weekly Fable quotas. Verification against
+signed-in Pro / Max or Team accounts is pending.
 
 ## Commands and settings
 

@@ -1,5 +1,56 @@
 # Nexus AI Usage changelog
 
+## 0.1.18 — 2026-11-18 (Preview)
+
+- Preserve standard Claude windows when the structured limit list only reports
+  a model-specific window.
+- Include a source-reported Fable limit next to Enterprise spend in the Claude
+  status bar summary and collapsed card.
+
+## 0.1.17 — 2026-11-18 (Preview)
+
+- Remove the experimental Claude Desktop history and Windows usage-page readers,
+  along with their diagnostics and display code.
+- Document the same-host installation requirements and data limits for each
+  provider in both READMEs.
+
+## 0.1.16 — 2026-11-18 (Preview)
+
+- When Claude Code is unavailable, use Windows accessibility to read quotas and
+  reset text from the open Claude Desktop Usage page, including Fable when shown.
+  Keep the existing history fallback for when the page cannot be read.
+
+## 0.1.15 — 2026-11-18 (Preview)
+
+- Describe Claude Desktop sample field names and types in Diagnostics, including
+  when the newest sample differs from the one usable by the dashboard. The
+  report omits account details and raw field values.
+
+## 0.1.14 — 2026-11-18 (Preview)
+
+- Show the source-reported Claude Fable weekly limit as a separate quota group
+  in the dashboard and identify it in the status bar and hover.
+- Explain the Claude Desktop sample refresh behavior and report the file's sample
+  time and the displayed reading's source time in Diagnostics.
+
+## 0.1.13 — 2026-11-18 (Preview)
+
+- Read Claude Desktop's local plan usage history when Claude Code cannot start
+  or its sign-in method does not provide subscription limits. Display the source
+  sample time and label the data Last recorded.
+- Check Windows MSIX and Roaming, macOS Application Support, and Linux XDG paths.
+  Report Desktop history presence and workspace ambiguity in Diagnostics.
+
+## 0.1.12 — 2026-11-18 (Preview)
+
+- Fall back to the official standalone Claude Code CLI's native install path
+  when the official editor extension's bundled CLI cannot start.
+- Report bundled and standalone CLI presence in Diagnostics and explain how to
+  resolve a missing CLI in the editor's extension host.
+- Parse Claude's `model_scoped` weekly windows, including Fable when the source
+  returns it. Team quotas are covered by synthetic CLI responses. Signed-in
+  Team and Pro / Max comparisons are pending.
+
 ## 0.1.11 — 2026-11-18 (Preview)
 
 - Fix broken README screenshots on the installed extension details page by
