@@ -188,7 +188,7 @@ test('activation wires isolated commands; updates all three providers without to
         assert.equal(refreshes, 0, 'Changing language must not query any provider');
         assert.equal(posted.at(-1).state.i18n.locale, 'zh-TW', 'Chinese can override an English editor');
         assert.match(barItem.text, /已用$/);
-        assert.match(barItem.tooltip.value, /來源事件時間/);
+        assert.match(barItem.tooltip.value, /開啟儀表板/);
         assert.equal(posted.at(-1).state.providers[1].spend.used, 35.14);
         assert.equal(posted.at(-1).state.timeZone, 'Asia/Taipei');
         receiver({ type: 'signIn' });
