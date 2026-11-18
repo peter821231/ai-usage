@@ -128,7 +128,7 @@ function hover(view) {
 class StatusBar {
     constructor() {
         this.item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 50);
-        this.item.name = 'Nexus AI Usage';
+        this.item.name = 'AI Usage';
         this.item.command = FOCUS;
     }
     update(view, options = {}) {

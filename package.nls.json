@@ -1,5 +1,5 @@
 {
-  "manifest.displayName": "Nexus AI Usage (Preview)",
+  "manifest.displayName": "AI Usage",
   "manifest.description": "Local AI quota monitor for Antigravity, Claude Pro/Max quotas, Enterprise spend and Codex. Independent preview derived from Quota Nexus.",
   "manifest.view.dashboard": "Dashboard",
   "manifest.command.refresh": "Refresh Usage",

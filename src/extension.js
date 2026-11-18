@@ -31,7 +31,7 @@ class Monitor {
         this.codex = new CodexReader(this.home);
         this.claudeContext = new ClaudeContextReader(this.home);
         this.bar = new StatusBar();
-        this.log = vscode.window.createOutputChannel('Nexus AI Usage', { log: true });
+        this.log = vscode.window.createOutputChannel('AI Usage', { log: true });
         this.view = new DashboardProvider(context.extensionUri, (msg) => this.onMessage(msg));
         this.snapshots = { antigravity: {}, claude: {}, codex: {} };
         this.abort = new AbortController();

@@ -1,4 +1,4 @@
-# Nexus AI Usage changelog
+# AI Usage changelog
 
 ## 0.1.18 — 2026-11-18 (Preview)
 

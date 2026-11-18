@@ -1,4 +1,4 @@
-# Nexus AI Usage (Preview)
+# AI Usage
 
 **English** | [繁體中文（台灣）](README.zh-TW.md)
 
@@ -133,7 +133,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 
 1. Download `nexus-ai-usage-<version>.vsix` from [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) or build it with `npm run package` into `artifacts/`.
 2. In the target IDE, run **Extensions: Install from VSIX…** and select the file.
-3. Open **Nexus AI Usage** in the Activity Bar and run **Show Diagnostics** to check the local sources.
+3. Open **AI Usage** in the Activity Bar and run **Show Diagnostics** to check the local sources.
 4. Compare values and reset times with each provider's official Usage view. Provider caches and the query interval can delay new readings.
 
 ## Sources, credentials and freshness
@@ -217,7 +217,7 @@ signed-in Pro / Max or Team accounts is pending.
 ## Commands and settings
 
 Commands: **Refresh Usage**, **Quick Settings**, **Open Settings**, **Toggle Used /
-Remaining**, and **Show Diagnostics**, all under **Nexus AI Usage**.
+Remaining**, and **Show Diagnostics**, all under **AI Usage**.
 
 Settings use only `nexusAiUsage.*`:
 

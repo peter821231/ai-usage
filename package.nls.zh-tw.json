@@ -1,5 +1,5 @@
 {
-  "manifest.displayName": "Nexus AI Usage（預覽版）",
+  "manifest.displayName": "AI Usage",
   "manifest.description": "本機 AI 額度監控工具，支援 Antigravity、Claude Pro/Max 額度、Enterprise 支出與 Codex。衍生自 Quota Nexus 的獨立預覽版。",
   "manifest.view.dashboard": "儀表板",
   "manifest.command.refresh": "重新整理用量",

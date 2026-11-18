@@ -15,6 +15,6 @@
 
 Nexus 0.1.12 會先啟動官方 Claude Code IDE 擴充套件內的 CLI，然後在啟動失敗時嘗試同一環境的原生安裝路徑。畫面上的 `Cannot start Claude Code in this extension host` 對應到程序啟動失敗，發生在 CLI 回傳 Team 額度之前。Nexus 使用真實 Team 帳戶的端對端比對仍待完成。[CLI 啟動程式](../src/claudeUsageCli.js)、[Dashboard 資料來源與診斷程式](../src/extension.js)
 
-1. 在出錯的同一個 IDE 視窗開命令選擇區。執行 **Nexus AI Usage: Show Diagnostics**，繁體中文介面為 **Nexus AI Usage: 顯示診斷資訊**。
-2. 在 **輸出**面板選擇 **Nexus AI Usage**，記下 `platform`、`remoteName`、`extensionVersion`、`officialClaudeVersion`、`officialCliPresent`、`nativeCliPresent`、`sources.claude.error`。
+1. 在出錯的同一個 IDE 視窗開命令選擇區。執行 **AI Usage: Show Diagnostics**，繁體中文介面為 **AI Usage: 顯示診斷資訊**。
+2. 在 **輸出**面板選擇 **AI Usage**，記下 `platform`、`remoteName`、`extensionVersion`、`officialClaudeVersion`、`officialCliPresent`、`nativeCliPresent`、`sources.claude.error`。
 3. 在同一視窗打開官方 **Claude Code** 面板，確認它能開啟並以 Team 工作區登入。在官方 Claude Code 的對話輸入欄執行 `/usage`，會開啟 **Account & usage**。記下它有沒有顯示 5 小時、每週及 Fable。若無法開啟面板，記下 IDE 顯示的錯誤。[Anthropic Team 登入指引](https://support.claude.com/en/articles/11845131-use-claude-code-with-your-team-or-enterprise-plan)、[官方 VS Code 面板的 `/usage` 操作](https://code.claude.com/docs/en/vs-code#check-account-and-usage)

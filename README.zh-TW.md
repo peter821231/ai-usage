@@ -1,4 +1,4 @@
-# Nexus AI Usage（預覽版）
+# AI Usage
 
 [English](README.md) | **繁體中文（台灣）**
 
@@ -93,7 +93,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 1. 從 [GitHub Releases](https://github.com/peter821231/nexus-ai-usage/releases) 下載 `nexus-ai-usage-<version>.vsix`，或在本機執行 `npm run package`，將套件建置到 `artifacts/`。
 2. 在目標 IDE 執行 **Extensions: Install from VSIX…**，選取下載的檔案。
-3. 在活動列開啟 **Nexus AI Usage**，執行 **Show Diagnostics（顯示診斷資訊）** 檢查本機來源。
+3. 在活動列開啟 **AI Usage**，執行 **Show Diagnostics（顯示診斷資訊）** 檢查本機來源。
 4. 將數值與重設時間和各服務的官方用量頁面比對。服務提供者的快取與查詢間隔可能延遲新讀數。
 
 ## 資料來源、驗證資訊與更新時效
@@ -157,7 +157,7 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 
 ## 命令與設定
 
-以下命令皆位於 **Nexus AI Usage** 類別下：
+以下命令皆位於 **AI Usage** 類別下：
 
 - **Refresh Usage**：重新整理用量。
 - **Quick Settings**：快速設定。

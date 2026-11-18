@@ -67,7 +67,7 @@
       "activitybar": [
         {
           "id": "nexusAiUsage",
-          "title": "Nexus AI Usage",
+          "title": "AI Usage",
           "icon": "assets/icon.svg"
         }
       ]
@@ -86,31 +86,31 @@
       {
         "command": "nexusAiUsage.refresh",
         "title": "%manifest.command.refresh%",
-        "category": "Nexus AI Usage",
+        "category": "AI Usage",
         "icon": "$(refresh)"
       },
       {
         "command": "nexusAiUsage.showDiagnostics",
         "title": "%manifest.command.showDiagnostics%",
-        "category": "Nexus AI Usage",
+        "category": "AI Usage",
         "icon": "$(pulse)"
       },
       {
         "command": "nexusAiUsage.quickSettings",
         "title": "%manifest.command.quickSettings%",
-        "category": "Nexus AI Usage",
+        "category": "AI Usage",
         "icon": "$(settings-gear)"
       },
       {
         "command": "nexusAiUsage.openSettings",
         "title": "%manifest.command.openSettings%",
-        "category": "Nexus AI Usage",
+        "category": "AI Usage",
         "icon": "$(gear)"
       },
       {
         "command": "nexusAiUsage.togglePercentMode",
         "title": "%manifest.command.togglePercentMode%",
-        "category": "Nexus AI Usage",
+        "category": "AI Usage",
         "icon": "$(arrow-both)"
       }
     ],
