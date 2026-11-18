@@ -172,7 +172,7 @@
             for (const r of g.rows) {
                 const item = el('p', 'detail');
                 item.append(
-                    el('strong', '', `${p.id === 'antigravity' ? g.label + ' · ' : ''}${r.label}: `),
+                    el('strong', '', `${p.id === 'antigravity' || g.groupType === 'fable' ? g.label + ' · ' : ''}${r.label}: `),
                     el('span', '', t('source.rowDetails', { reset: resetText(r), time: stamp(r.observedAt) }))
                 );
                 details.append(item);
@@ -183,7 +183,8 @@
     }
     function preview(p) {
         const mini = el('div', 'card-preview');
-        if (p.spend && p.primaryMetric !== 'quota') {
+        const spendFirst = p.spend && p.primaryMetric !== 'quota';
+        if (spendFirst) {
             mini.append(
                 el(
                     'strong',
@@ -192,12 +193,14 @@
                 ),
                 meter(p.spend.usedPct, t('budget.usedLabel'))
             );
-        } else {
+        }
+        const groups = spendFirst ? p.groups.filter((g) => g.groupType === 'fable') : p.groups;
+        if (groups.length) {
             const grid = el('div', 'mini-grid');
-            for (const g of p.groups)
+            for (const g of groups)
                 for (const r of g.rows) {
                     const item = el('div', 'mini-item');
-                    const label = `${p.id === 'antigravity' ? g.short + ' ' : ''}${i18n.windowLabel(r, true)}`;
+                    const label = `${p.id === 'antigravity' || g.groupType === 'fable' ? g.short + ' ' : ''}${i18n.windowLabel(r, true)}`;
                     item.append(
                         el('span', 'muted', label),
                         el(

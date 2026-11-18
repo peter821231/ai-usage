@@ -141,7 +141,7 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
     const data = snapshot.data;
     const timing = { ...snapshot, observedAt: data?.fetchedAt || null };
     const windows = [...(data?.windows || [])];
-    if (['pro', 'max'].includes(data?.plan) && data.available !== false) {
+    if (['pro', 'max', 'team'].includes(data?.plan) && data.available !== false) {
         for (const [id, name] of [
             ['five_hour', '5-hour'],
             ['seven_day', 'Weekly']
@@ -149,18 +149,31 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
             if (!windows.some((w) => w.name === name))
                 windows.push({ id: `missing:${id}`, name, usedPct: null, resetAt: null });
     }
+    const rows = [];
+    const fableRows = [];
+    for (const w of windows) {
+        const reading = {
+            ...row(w.id, w.name, w.usedPct, w.resetAt, timing, 10 * 60000, now),
+            timeBasis: 'fetched'
+        };
+        const fable = reading.windowType === 'weekly' && /^(?:Claude[ -])?Fable\b(.*)$/i.exec(reading.scope);
+        if (fable) {
+            const scope = fable[1].trim();
+            fableRows.push({ ...reading, label: scope ? `Weekly · ${scope}` : 'Weekly', scope });
+        } else {
+            rows.push(reading);
+        }
+    }
     const groups = [
         {
             id: 'claude-windows',
             label: 'Time-window quotas',
             groupType: 'timeWindows',
             short: 'Claude',
-            rows: windows.map((w) => ({
-                ...row(w.id, w.name, w.usedPct, w.resetAt, timing, 10 * 60000, now),
-                timeBasis: 'fetched'
-            }))
+            rows
         }
     ];
+    if (fableRows.length) groups.push({ id: 'claude-fable', label: 'Fable', groupType: 'fable', short: 'Fable', rows: fableRows });
     const reset = spendReset(data, resetPolicy);
     const spend = data?.spend
         ? {
@@ -187,7 +200,7 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
         source: 'Official Claude Code CLI · account usage',
         groups,
         spend,
-        primaryMetric: data?.plan !== 'enterprise' && groups[0].rows.length ? 'quota' : 'spend',
+        primaryMetric: data?.plan !== 'enterprise' && windows.length ? 'quota' : 'spend',
         plan: data?.plan || '',
         observedAt: timing.observedAt,
         error: snapshot.error || '',

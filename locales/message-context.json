@@ -17,6 +17,7 @@
   "group.gemini": "Known model group or time-window quota heading. Argon stays a separate group.",
   "group.claudeGpt": "Known model group or time-window quota heading. Argon stays a separate group.",
   "group.argon": "Known model group or time-window quota heading. Argon stays a separate group.",
+  "group.fable": "Heading for Claude Fable's independent weekly quota. Keep the model name Fable.",
   "group.timeWindows": "Known model group or time-window quota heading. Argon stays a separate group.",
   "action.refresh": "Button or accessibility label. Preserve provider names in expand/collapse actions.",
   "action.settings": "Button or accessibility label. Preserve provider names in expand/collapse actions.",

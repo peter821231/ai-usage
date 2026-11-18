@@ -9,7 +9,12 @@ test('activation wires isolated commands; updates all three providers without to
     const posted = [];
     const logs = [];
     const settings = new Map();
-    const barItem = { show() {}, hide() {}, dispose() {} };
+    const barItem = {
+        show() { this.visible = true; },
+        hide() { this.visible = false; },
+        dispose() {}
+    };
+    let codexLimits = null;
     let provider;
     let receiver;
     let configurationChanged;
@@ -35,6 +40,7 @@ test('activation wires isolated commands; updates all three providers without to
                 assert.equal(section, 'nexusAiUsage');
                 return {
                     get: (key) => settings.get(key),
+                    inspect: (key) => ({ defaultValue: true, globalValue: settings.get(key) }),
                     update: async (key, value, target) => {
                         assert.equal(target, vscode.ConfigurationTarget.Global);
                         settings.set(key, value);
@@ -80,7 +86,7 @@ test('activation wires isolated commands; updates all three providers without to
         './codex': {
             CodexReader: class {
                 async read() {
-                    return { limits: { at: Date.now(), windows: [{ name: '5-hour', pct: 16 }] } };
+                    return codexLimits && { limits: codexLimits };
                 }
             }
         },
@@ -115,6 +121,7 @@ test('activation wires isolated commands; updates all three providers without to
         for (const name of ['extension', 'config', 'statusBar', 'webview'])
             delete require.cache[require.resolve('../src/' + name)];
         monitor = require('../src/extension').activate(context);
+        assert.equal(barItem.visible, false);
         for (const c of require('../package.json').contributes.commands) assert.ok(commands.has(c.command));
         assert.ok([...commands.keys()].every((k) => !/switch|signIn/.test(k)));
         provider.resolveWebviewView({
@@ -137,7 +144,36 @@ test('activation wires isolated commands; updates all three providers without to
         assert.equal(state.providers[1].spend.used, 35.14);
         assert.ok(state.providers[0].groups.some((g) => g.label === 'Gemini 4 Argon'));
         assert.doesNotMatch(JSON.stringify(state), /private@example/);
+        const settingValue = (key) => posted.at(-1).state.settings.flatMap((group) => group.items)
+            .find((item) => item.key === key).value;
+        const codexSetting = 'codex.showInStatusBar';
+        assert.equal(barItem.visible, true);
         assert.match(barItem.text, /Argon wk 7%/);
+        assert.match(barItem.text, /Claude/);
+        assert.doesNotMatch(barItem.text, /Codex/);
+        assert.match(barItem.tooltip.value, /Codex/);
+        assert.equal(settingValue(codexSetting), false);
+        assert.equal(settings.size, 0);
+
+        await monitor.onMessage({ type: 'setSetting', key: codexSetting, value: true });
+        monitor.render();
+        assert.match(barItem.text, /Codex/);
+        assert.equal(settingValue(codexSetting), true);
+
+        await monitor.onMessage({ type: 'setSetting', key: codexSetting, value: false });
+        codexLimits = { at: Date.now(), windows: [{ name: '5-hour', pct: 0 }] };
+        await monitor.refresh();
+        assert.doesNotMatch(barItem.text, /Codex/);
+        assert.equal(settingValue(codexSetting), false);
+
+        settings.delete(codexSetting);
+        monitor.render();
+        assert.match(barItem.text, /Codex 5h 0%/);
+        assert.equal(settingValue(codexSetting), true);
+        codexLimits = null;
+        await monitor.refresh();
+        assert.match(barItem.text, /Codex 5h 0%/);
+
         await monitor.onMessage({ type: 'setSetting', key: 'antigravity.statusBar.argonWeekly', value: false });
         monitor.render();
         assert.equal(settings.get('antigravity.statusBar.argonWeekly'), false);

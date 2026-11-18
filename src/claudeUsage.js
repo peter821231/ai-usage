@@ -114,15 +114,23 @@ function parseUsage(raw, fetchedAt = Date.now()) {
             push(`${kind}:${scopeId}:${index}`, scope ? `${label} · ${scope}` : label, w.percent, w.resets_at);
         }
     }
-    if (!windows.length) {
-        for (const [key, label] of [
-            ['five_hour', '5-hour'],
-            ['seven_day', 'Weekly'],
-            ['seven_day_opus', 'Weekly · Opus'],
-            ['seven_day_sonnet', 'Weekly · Sonnet'],
-            ['seven_day_oauth_apps', 'Weekly · OAuth apps']
-        ]) {
-            if (object(rate[key])) push(key, label, rate[key].utilization, rate[key].resets_at);
+    for (const [key, label] of [
+        ['five_hour', '5-hour'],
+        ['seven_day', 'Weekly'],
+        ['seven_day_opus', 'Weekly · Opus'],
+        ['seven_day_sonnet', 'Weekly · Sonnet'],
+        ['seven_day_oauth_apps', 'Weekly · OAuth apps']
+    ]) {
+        if (object(rate[key]) && !windows.some((window) => window.name === label))
+            push(key, label, rate[key].utilization, rate[key].resets_at);
+    }
+    if (Array.isArray(rate.model_scoped)) {
+        for (const [index, w] of rate.model_scoped.entries()) {
+            const model = text(w?.display_name);
+            if (!model) continue;
+            const label = `Weekly · ${model}`;
+            if (!windows.some((window) => window.name === label))
+                push(`model_scoped:${index}`, label, w.utilization, w.resets_at);
         }
     }
     const spend = parseSpend(rate);

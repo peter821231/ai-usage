@@ -7,7 +7,7 @@ const cfg = require('./config');
 const { AgyClient } = require('./agyClient');
 const { CodexReader } = require('./codex');
 const { ClaudeContextReader } = require('./claudeCode');
-const { bundledCliPath, fetchUsage, UsageCliError } = require('./claudeUsageCli');
+const { bundledCliPath, nativeCliPath, fetchHostUsage } = require('./claudeUsageCli');
 const { parseUsage } = require('./claudeUsage');
 const { refreshClaude } = require('./claudeUsageStore');
 const { buildUsageState } = require('./usageState');
@@ -15,6 +15,13 @@ const { StatusBar, AG_STATUS_WINDOWS } = require('./statusBar');
 const { DashboardProvider } = require('./webview');
 const { settingsView, isValidSetting } = require('./settingsUi');
 const { createI18n, localizeView } = require('./i18n');
+
+const PROVIDER_SETTINGS = { antigravity: 'antigravity', claude: 'claudeCode', codex: 'codex' };
+
+function hasUsage(provider) {
+    return Number.isFinite(provider.spend?.used) || Number.isFinite(provider.spend?.limit)
+        || provider.groups.some((group) => group.rows.some((row) => Number.isFinite(row.usedPct)));
+}
 
 class Monitor {
     constructor(context) {
@@ -142,17 +149,13 @@ class Monitor {
                 storageDir,
                 force,
                 signal: this.abort.signal,
-                query: async (signal) => {
-                    if (!official) throw new UsageCliError('cli-unavailable');
-                    return parseUsage(
-                        await fetchUsage({
-                            command: bundledCliPath(official.extensionPath),
-                            cwd: storageDir,
-                            timeoutMs: cfg.get('claudeCode.timeoutSeconds', 45) * 1000,
-                            signal
-                        })
-                    );
-                }
+                query: async (signal) => parseUsage(await fetchHostUsage({
+                    extensionPath: official?.extensionPath,
+                    home: this.home,
+                    cwd: storageDir,
+                    timeoutMs: cfg.get('claudeCode.timeoutSeconds', 45) * 1000,
+                    signal
+                }))
             });
             if (result) {
                 s.data = result.data;
@@ -175,18 +178,22 @@ class Monitor {
             percentMode: cfg.get('display.percentMode', 'used'),
             enterpriseResetSchedule: cfg.get('claudeCode.enterpriseResetSchedule', 'monthlyUtc')
         };
-        for (const [id, key] of [
-            ['antigravity', 'antigravity'],
-            ['claude', 'claudeCode'],
-            ['codex', 'codex']
-        ]) {
+        for (const [id, key] of Object.entries(PROVIDER_SETTINGS)) {
             input[id] = { ...input[id], enabled: cfg.get(`${key}.enable`, true) };
         }
         const i18n = createI18n(cfg.get('display.language', 'auto'), vscode.env.language);
         const view = localizeView(buildUsageState(input), i18n);
+        const statusVisibility = new Map();
+        const hidden = [];
+        for (const provider of view.providers) {
+            const key = `${PROVIDER_SETTINGS[provider.id]}.showInStatusBar`;
+            const visible = cfg.getExplicitBoolean(key) ?? hasUsage(provider);
+            statusVisibility.set(key, visible);
+            if (!visible) hidden.push(provider.id);
+        }
         view.showContext = cfg.get('context.show', false);
         view.timeZone = cfg.timeZone();
-        view.settings = settingsView((k) => cfg.get(k), i18n);
+        view.settings = settingsView((key) => statusVisibility.get(key) ?? cfg.get(key), i18n);
         this.bar.update(view, {
             show: cfg.get('statusBar.show', true),
             antigravityWindows: Object.fromEntries(
@@ -194,9 +201,7 @@ class Monitor {
                     choice.key, cfg.get(`antigravity.statusBar.${choice.key}`, choice.default)
                 ])
             ),
-            hidden: ['antigravity', 'claude', 'codex'].filter(
-                (id) => !cfg.get(`${id === 'claude' ? 'claudeCode' : id}.showInStatusBar`, true)
-            )
+            hidden
         });
         this.view.setState(view);
     }
@@ -214,6 +219,7 @@ class Monitor {
             extensionVersion: this.context.extension.packageJSON.version,
             officialClaudeVersion: official?.packageJSON.version || null,
             officialCliPresent: !!official && fs.existsSync(bundledCliPath(official.extensionPath)),
+            nativeCliPresent: fs.existsSync(nativeCliPath(this.home)),
             codexLogsPresent: fs.existsSync(path.join(this.home, '.codex', 'sessions')),
             antigravityConnected: !!this.agy.server,
             sources: Object.fromEntries(
