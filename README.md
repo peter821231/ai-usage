@@ -12,7 +12,18 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## UI preview — 0.1.6
+## UI preview — 0.1.19
+
+Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
+Hover over it for grouped limits, status dots, larger progress segments, and
+reset times. Click the gauge to open the dashboard.
+
+![AI Usage 0.1.19 compact status bar and grouped hover with demo data for Antigravity, Claude Enterprise, and Codex](docs/images/v0.1.19-compact-hover-demo.png)
+
+The preview uses demo values. The maintainer verified the larger segments and
+compact mode in the IDE on 2026-11-18 using the Traditional Chinese interface.
+
+## Earlier UI preview — 0.1.6
 
 The status bar, dashboard and hover below are maintainer-provided screenshots from
 Antigravity IDE on **2026-11-17**. Values are account-specific snapshots, not live
@@ -25,8 +36,6 @@ readings or fixed budgets. The settings preview is separately labelled synthetic
 
 Gemini **5-hour / Weekly** and **Argon Weekly** are selected by default. Claude/GPT
 can be added in settings; the complete limits remain in the hover and dashboard.
-Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
-Hover over it for the full quota preview or click it to open the dashboard.
 
 ### Detailed dashboard
 

@@ -10,7 +10,17 @@
 `nexus-ai-usage-local.nexus-ai-usage`，不會取代 Quota Nexus 或移轉其資料。
 這是非官方專案，與 Google、Anthropic 或 OpenAI 均無隸屬關係。
 
-## 介面預覽 — 0.1.6
+## 介面預覽 — 0.1.19
+
+在 **設定 → 狀態列 → 精簡模式** 勾選後，狀態列只顯示一個額度儀表。
+將滑鼠移到圖示上，可查看各群組的額度、燈號、放大的分段進度條和重設時間。
+點一下圖示即可開啟儀表板。
+
+![AI Usage 0.1.19 精簡狀態列及額度預覽，使用 Antigravity、Claude Enterprise 和 Codex 的示範資料](docs/images/v0.1.19-compact-hover-demo.png)
+
+上圖採用示範資料。維護者於 2026-11-18 在 IDE 的繁體中文介面確認放大的分段進度條與精簡模式。
+
+## 舊版介面預覽 — 0.1.6
 
 以下狀態列、儀表板與滑鼠懸停提示的截圖，由維護者於 **2026-11-17** 在 Antigravity IDE 中擷取。
 數值是特定帳戶在當下的紀錄，並非即時讀數，也不代表固定預算。
@@ -22,8 +32,6 @@
 
 預設選取 Gemini **5-hour / Weekly（5 小時／每週）** 及 **Argon Weekly（Argon 每週）**。
 可在設定中加入 Claude/GPT；滑鼠懸停提示與儀表板仍會顯示完整額度。
-在 **設定 → 狀態列 → 精簡模式** 勾選後，狀態列只顯示一個額度儀表。
-將滑鼠移到圖示上可查看完整額度，點一下可開啟儀表板。
 
 ### 詳細儀表板
 
@@ -51,7 +59,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 </details>
 
-圖片來源、畫面中的變更，以及重新產生合成設定預覽的方式，請參閱[預覽來源與介面重點（英文）](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md)。
+圖片來源、畫面中的變更，以及重新產生合成設定預覽的方式，請參閱[預覽來源與介面重點](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md)。
 
 ## 介面語言
 
