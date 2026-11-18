@@ -2,6 +2,7 @@
 
 const vscode = require('vscode');
 const crypto = require('crypto');
+const { createI18n } = require('./i18n');
 
 const ALLOWED = new Set(['ready', 'refresh', 'openSettings', 'diagnostics', 'setSetting']);
 
@@ -66,6 +67,8 @@ class DashboardProvider {
     html(webview, media) {
         const nonce = crypto.randomBytes(16).toString('base64');
         const css = webview.asWebviewUri(vscode.Uri.joinPath(media, 'main.css'));
+        const i18nJs = webview.asWebviewUri(vscode.Uri.joinPath(media, 'i18n.js'));
+        const lang = this.state?.i18n?.locale || createI18n('auto', vscode.env?.language).locale;
         const js = webview.asWebviewUri(vscode.Uri.joinPath(media, 'main.js'));
         const csp = [
             "default-src 'none'",
@@ -74,7 +77,7 @@ class DashboardProvider {
             `script-src 'nonce-${nonce}'`
         ].join('; ');
         return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">
@@ -84,6 +87,7 @@ class DashboardProvider {
 </head>
 <body>
 <div id="root" aria-live="polite"></div>
+<script nonce="${nonce}" src="${i18nJs}"></script>
 <script nonce="${nonce}" src="${js}"></script>
 </body>
 </html>`;

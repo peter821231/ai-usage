@@ -1,5 +1,38 @@
 # Nexus AI Usage changelog
 
+## 0.1.10 — 2026-11-17 (Preview)
+
+- Store translations in a Map to avoid dynamic property writes flagged by CodeQL.
+- Normalize CRLF when checking generated locale files so Windows checkouts pass
+  the same consistency check as Linux and macOS. Add regression coverage for both.
+
+## 0.1.9 — 2026-11-17 (Preview)
+
+- Derive language-selection test expectations from the registered catalogs so
+  new translations no longer require JavaScript test changes. Run the real test
+  suite with synthetic French and German catalogs as a regression check.
+- Translate the application fallback for missing context model names while
+  preserving actual provider labels and context values.
+- Keep Claude errors as codes in the usage state and resolve display text from
+  the language catalog, removing duplicate English error messages.
+
+## 0.1.8 — 2026-11-17 (Preview)
+
+- Review Taiwan Traditional Chinese against the pinned Taiwan.md terminology
+  snapshot; align reset, template, view and conversation-context wording.
+- Clarify that internal Antigravity Prompt/Flow credit fields have unverified
+  semantics. No credit parsing, quota calculations or rendering behavior changes.
+
+## 0.1.7 — 2026-11-17 (Preview)
+
+- Add independently selectable English and Taiwan Traditional Chinese for the
+  dashboard, quick settings, status bar, hover and accessibility labels. Follow
+  the editor by default; keep native contributions tied to editor language.
+- Preserve source identities, values, timestamps, selected windows and UI focus
+  when switching language, without issuing provider queries.
+- Add single-file JSON translation catalogs, a template generator, placeholder
+  validation and generated native manifest translations. No runtime dependencies.
+
 ## 0.1.6 — 2026-11-17 (Preview)
 
 - Default Antigravity's status summary to Gemini Models 5-hour / Weekly and

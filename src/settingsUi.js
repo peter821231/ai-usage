@@ -1,27 +1,19 @@
 'use strict';
 
 const pkg = require('../package.json');
+const { createI18n } = require('./i18n');
 
 const PREFIX = 'nexusAiUsage.';
-// Short labels for the dashboard panel; the full description shows on hover.
-const LABELS = {
-    'display.percentMode': 'Percentages',
-    'display.timeZone': 'Timezone',
-    'refresh.activeInterval': 'Check sources every',
-    'refresh.pauseWhenUnfocused': 'Pause in background',
-    'context.show': 'Conversation context',
-    'statusBar.show': 'Show selected summary',
-    'antigravity.statusBar.geminiFiveHour': 'Gemini Models · 5-hour',
-    'antigravity.statusBar.geminiWeekly': 'Gemini Models · Weekly',
-    'antigravity.statusBar.claudeGptFiveHour': 'Claude/GPT · 5-hour',
-    'antigravity.statusBar.claudeGptWeekly': 'Claude/GPT · Weekly',
-    'antigravity.statusBar.argonWeekly': 'Gemini 4 Argon · Weekly',
-    'claudeCode.timeoutSeconds': 'Query timeout',
-    'claudeCode.enterpriseResetSchedule': 'Enterprise reset'
-};
-const TOOL_LABELS = { enable: 'Monitor', showInStatusBar: 'In status bar' };
+// Display labels are resolved for each render, never at module load time.
+const LABEL_KEYS = new Set([
+    'display.language', 'display.percentMode', 'display.timeZone', 'refresh.activeInterval',
+    'refresh.pauseWhenUnfocused', 'context.show', 'statusBar.show',
+    'antigravity.statusBar.geminiFiveHour', 'antigravity.statusBar.geminiWeekly',
+    'antigravity.statusBar.claudeGptFiveHour', 'antigravity.statusBar.claudeGptWeekly',
+    'antigravity.statusBar.argonWeekly', 'claudeCode.timeoutSeconds', 'claudeCode.enterpriseResetSchedule'
+]);
 const NEEDS = Object.fromEntries(
-    Object.keys(LABELS)
+    [...LABEL_KEYS]
         .filter((key) => key.startsWith('antigravity.statusBar.'))
         .map((key) => [key, 'antigravity.showInStatusBar'])
 );
@@ -40,6 +32,7 @@ function kindOf(p) {
 
 // Built from package.json so the panel and VS Code Settings never drift apart.
 const MODEL = pkg.contributes.configuration.map((cat) => ({
+    id: Object.keys(cat.properties)[0].split('.')[1],
     title: cat.title,
     items: Object.entries(cat.properties)
         .filter(([, p]) => !p.markdownDeprecationMessage && kindOf(p))
@@ -48,8 +41,8 @@ const MODEL = pkg.contributes.configuration.map((cat) => ({
             const key = full.slice(PREFIX.length);
             const item = {
                 key,
-                label: LABELS[key] || TOOL_LABELS[key.split('.').pop()] || key,
-                help: plain(p.description || p.markdownDescription),
+                labelKey: `settings.label.${LABEL_KEYS.has(key) ? key : key.split('.').pop()}`,
+                help: p.description || p.markdownDescription,
                 kind: kindOf(p),
                 def: p.default
             };
@@ -72,18 +65,30 @@ function isValidSetting(key, value) {
     return false;
 }
 
-function settingsView(get) {
+function settingsView(get, i18n = createI18n('en')) {
+    const resolve = (value) => {
+        const match = /^%([^%]+)%$/.exec(value || '');
+        return match ? i18n.t(match[1]) : value;
+    };
     const val = (k) => {
         const v = get(k);
         return v === undefined ? BY_KEY.get(k).def : v;
     };
     return MODEL.map((g) => ({
-        title: g.title,
+        id: g.id,
+        title: resolve(g.title),
         items: g.items.map((i) => {
             const toolSwitch = `${i.key.split('.')[0]}.enable`;
             const toolOff = i.key !== toolSwitch && BY_KEY.has(toolSwitch) && val(toolSwitch) === false;
             const needOff = NEEDS[i.key] ? val(NEEDS[i.key]) !== true : false;
-            return { ...i, value: val(i.key), disabled: toolOff || needOff };
+            return {
+                ...i,
+                label: i18n.t(i.labelKey),
+                help: plain(resolve(i.help)),
+                options: i.options?.map((option) => ({ ...option, label: resolve(option.label) })),
+                value: val(i.key),
+                disabled: toolOff || needOff
+            };
         })
     }));
 }

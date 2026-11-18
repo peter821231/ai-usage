@@ -12,6 +12,7 @@ test('activation wires isolated commands; updates all three providers without to
     const barItem = { show() {}, hide() {}, dispose() {} };
     let provider;
     let receiver;
+    let configurationChanged;
     const disposable = () => ({ dispose() {} });
     const vscode = {
         StatusBarAlignment: { Right: 2 },
@@ -26,7 +27,7 @@ test('activation wires isolated commands; updates all three providers without to
             }
         },
         Uri: { joinPath: (u, ...parts) => ({ fsPath: path.join(u.fsPath, ...parts) }) },
-        env: { remoteName: 'wsl' },
+        env: { remoteName: 'wsl', language: 'en' },
         extensions: { getExtension: () => undefined },
         workspace: {
             workspaceFolders: [],
@@ -40,7 +41,10 @@ test('activation wires isolated commands; updates all three providers without to
                     }
                 };
             },
-            onDidChangeConfiguration: disposable
+            onDidChangeConfiguration: (listener) => {
+                configurationChanged = listener;
+                return disposable();
+            }
         },
         window: {
             state: { focused: true },
@@ -140,6 +144,17 @@ test('activation wires isolated commands; updates all three providers without to
         assert.doesNotMatch(barItem.text, /Argon/);
         assert.match(barItem.tooltip.value, /Gemini 4 Argon/);
         assert.ok(posted.at(-1).state.providers[0].groups.some((g) => g.label === 'Gemini 4 Argon'));
+        clearTimeout(monitor.startTimer);
+        let refreshes = 0;
+        monitor.refresh = async () => { refreshes++; };
+        await monitor.onMessage({ type: 'setSetting', key: 'display.language', value: 'zh-TW' });
+        configurationChanged({ affectsConfiguration: (key) => ['nexusAiUsage', 'nexusAiUsage.display.language'].includes(key) });
+        assert.equal(refreshes, 0, 'Changing language must not query any provider');
+        assert.equal(posted.at(-1).state.i18n.locale, 'zh-TW', 'Chinese can override an English editor');
+        assert.match(barItem.text, /已用$/);
+        assert.match(barItem.tooltip.value, /來源事件時間/);
+        assert.equal(posted.at(-1).state.providers[1].spend.used, 35.14);
+        assert.equal(posted.at(-1).state.timeZone, 'Asia/Taipei');
         receiver({ type: 'signIn' });
         await commands.get('nexusAiUsage.showDiagnostics')();
         assert.doesNotMatch(logs.join(''), /private@example/);

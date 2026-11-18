@@ -59,6 +59,19 @@ only the summary, not provider polling or the full dashboard.
 See [preview provenance and UI highlights](https://github.com/peter821231/nexus-ai-usage/blob/main/docs/ui-previews.md) for image sources,
 the changes illustrated and instructions to regenerate the synthetic settings view.
 
+## Interface language
+
+Open **Quick Settings → General → Language** to choose **Follow Editor** (default),
+**English**, or **繁體中文（台灣）**. The dashboard, quick settings and status bar
+switch immediately, including source details and accessibility labels. This lets
+an English editor show usage in Taiwan Traditional Chinese.
+
+Command names, native editor settings and static view names follow the editor's
+display language. Language selection does not change the timezone, usage values
+or source timestamps, and does not query providers. Missing translations fall
+back to English. See the [translation contribution guide](locales/README.md) to
+generate a template and add another language.
+
 ## Features
 
 - **Antigravity:** Gemini Models 5-hour and weekly; Claude and GPT models 5-hour
@@ -79,8 +92,9 @@ the changes illustrated and instructions to regenerate the synthetic settings vi
   Reduced header padding, row heights and section spacing keep more usage visible
   in the sidebar while retaining quota labels, resets and separate budget/context.
   Full source times and absolute resets remain in each card’s **Source & reset
-  details** disclosure. Existing Antigravity credits and model labels are available
-  without extra queries.
+  details** disclosure. Model labels and internal Antigravity credit fields are read without
+  extra queries. The meaning and scale of those credit fields have not been
+  verified against the official Usage UI; they are not confirmed quota balances.
 - The status bar hover includes compact usage charts and used/remaining values.
 - Antigravity's status summary defaults to **Gemini Models 5-hour / Weekly** and
   independent **Gemini 4 Argon Weekly**. Five boolean choices let you include or
@@ -200,6 +214,7 @@ Remaining**, and **Show Diagnostics**, all under **Nexus AI Usage**.
 Settings use only `nexusAiUsage.*`:
 
 - `display.percentMode`: `used` or `left`.
+- `display.language`: `auto` (follow editor), `en` or `zh-TW`.
 - `display.timeZone`: `Asia/Taipei` (default) or `UTC`.
 - `refresh.activeInterval`: 30 seconds, 1 minute, 2 minutes or 5 minutes.
 - `refresh.pauseWhenUnfocused`: pause regular checks in the background.

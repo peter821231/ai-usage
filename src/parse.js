@@ -187,10 +187,10 @@ function pickTrajectory(summaries, wsPaths) {
 
 // gemini-3.8-flash-n -> "Gemini 3.8 Flash": match a known label, else title-case the id.
 function prettyModel(raw, modelLabels) {
-    if (!raw || typeof raw !== 'string') return 'Unknown model';
+    if (!raw || typeof raw !== 'string') return null;
     if (modelLabels && modelLabels[raw]) return modelLabels[raw];
     const s = raw.replace(/^models[/_-]/i, '').replace(/-n$/i, '');
-    if (/^MODEL_PLACEHOLDER_/i.test(s)) return 'Unknown model';
+    if (/^MODEL_PLACEHOLDER_/i.test(s)) return null;
     const words = s
         .toLowerCase()
         .split(/[-_\s]+/)
@@ -201,7 +201,7 @@ function prettyModel(raw, modelLabels) {
         .map(base)
         .find((l) => l.toLowerCase() === words);
     if (hit) return hit;
-    return words.replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 100);
+    return words ? words.replace(/\b[a-z]/g, (c) => c.toUpperCase()).slice(0, 100) : null;
 }
 
 function parseGeneratorMetadata(data, modelLabels, picked) {
@@ -226,7 +226,8 @@ function parseGeneratorMetadata(data, modelLabels, picked) {
     return {
         source: 'antigravity',
         title: str(sum.summary, 200) || (sum.annotations && str(sum.annotations.title, 200)) || 'Active conversation',
-        model,
+        model: model || 'Unknown model',
+        modelKnown: model !== null,
         usedTokens,
         windowTokens,
         pct: Math.min(100, Math.round((usedTokens / windowTokens) * 1000) / 10),
