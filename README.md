@@ -25,8 +25,8 @@ readings or fixed budgets. The settings preview is separately labelled synthetic
 
 Gemini **5-hour / Weekly** and **Argon Weekly** are selected by default. Claude/GPT
 can be added in settings; the complete limits remain in the hover and dashboard.
-Status bar width is shared with the IDE and other extensions, so choose the
-summaries that fit your window.
+Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
+Hover over it for the full quota preview or click it to open the dashboard.
 
 ### Detailed dashboard
 
@@ -95,7 +95,8 @@ generate a template and add another language.
   details** disclosure. Model labels and internal Antigravity credit fields are read without
   extra queries. The meaning and scale of those credit fields have not been
   verified against the official Usage UI; they are not confirmed quota balances.
-- The status bar hover includes compact usage charts and used/remaining values.
+- The status bar hover groups quota windows with a status dot, a segmented
+  progress bar, the selected percentage and the reset time.
 - Antigravity's status summary defaults to **Gemini Models 5-hour / Weekly** and
   independent **Gemini 4 Argon Weekly**. Five boolean choices let you include or
   omit each window; these affect only the summary, not the full hover or dashboard.
@@ -229,6 +230,7 @@ Settings use only `nexusAiUsage.*`:
 - `statusBar.show`, plus each provider's `enable` and `showInStatusBar`. When
   `showInStatusBar` is unset, the provider appears once quota or spend data is
   available. An explicit setting overrides automatic visibility.
+- `statusBar.compact`: show only the quota gauge icon. Off by default.
 - Under `antigravity.statusBar.*`, `geminiFiveHour`, `geminiWeekly` and `argonWeekly`
   are on by default; `claudeGptFiveHour` and `claudeGptWeekly` are off by default.
 - `claudeCode.timeoutSeconds`: 15, 30, 45 (default) or 60 seconds.
@@ -245,7 +247,8 @@ still include all monitored windows, even ones omitted from the status bar.
 Status bar space is shared with the IDE and other extensions. Width, font/zoom
 and the other items determine what fits; this extension does not claim a fixed
 character maximum or silently truncate values. Choose the summaries you need.
-The hover and dashboard settings explicitly explain that only a subset is shown.
+The hover includes every monitored limit. Its dots turn yellow at 75% used and
+red at 90% used, and a white dot marks an unknown reading.
 See [0.1.6 status-bar choices](docs/status-bar-0.1.6.md) for the exact settings and
 the distinction between recorded Codex data and read failures.
 

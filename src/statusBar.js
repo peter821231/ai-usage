@@ -4,6 +4,7 @@ const { clampPct, escapeMarkdown: esc } = require('./util');
 const { createI18n } = require('./i18n');
 const { createTranslator } = require('../media/i18n');
 const FOCUS = 'nexusAiUsage.dashboard.focus';
+const QUOTA_ICON = '$(dashboard)';
 const AG_STATUS_WINDOWS = [
     { key: 'geminiFiveHour', groupType: 'gemini', windowType: 'fiveHour', default: true },
     { key: 'geminiWeekly', groupType: 'gemini', windowType: 'weekly', default: true },
@@ -135,10 +136,12 @@ class StatusBar {
         const visibleProviders = view.providers.filter((p) => !options.hidden?.includes(p.id))
             .map((p) => selectStatusProvider(p, options.antigravityWindows))
             .filter((p) => p.id !== 'antigravity' || p.groups.length);
-        this.item.text = '$(dashboard) ' + visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')
-            + (visibleProviders.length ? ` · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}` : i18n.t('status.hidden'));
+        const label = visibleProviders.length
+            ? `${visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')} · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}`
+            : i18n.t('status.hidden');
+        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${label}`;
         this.item.tooltip = hover(view);
-        this.item.accessibilityInformation = { label: this.item.text.replace('$(dashboard)', '') };
+        this.item.accessibilityInformation = { label };
         this.item.backgroundColor = visibleProviders.some((p) => p.id === 'codex' ? !!p.error : !!marker(p))
             ? new vscode.ThemeColor('statusBarItem.warningBackground') : undefined;
         if (options.show === false || !visibleProviders.length) this.item.hide();

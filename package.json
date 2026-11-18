@@ -225,6 +225,12 @@
             "default": true,
             "description": "%manifest.setting.statusBar.show.description%",
             "order": 1
+          },
+          "nexusAiUsage.statusBar.compact": {
+            "type": "boolean",
+            "default": false,
+            "description": "%manifest.setting.statusBar.compact.description%",
+            "order": 2
           }
         }
       },

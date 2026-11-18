@@ -196,6 +196,7 @@ class Monitor {
         view.settings = settingsView((key) => statusVisibility.get(key) ?? cfg.get(key), i18n);
         this.bar.update(view, {
             show: cfg.get('statusBar.show', true),
+            compact: cfg.get('statusBar.compact', false),
             antigravityWindows: Object.fromEntries(
                 AG_STATUS_WINDOWS.map((choice) => [
                     choice.key, cfg.get(`antigravity.statusBar.${choice.key}`, choice.default)

@@ -189,6 +189,14 @@ test('unselected Antigravity windows do not color the selected summary', () => {
     assert.equal(items[0].backgroundColor, undefined);
     bar.update(v, { antigravityWindows: { claudeGptFiveHour: true } });
     assert.ok(items[0].backgroundColor);
+    bar.update(v, { compact: true, antigravityWindows: { claudeGptFiveHour: true } });
+    assert.equal(items[0].text, '$(dashboard)');
+    assert.match(items[0].accessibilityInformation.label, /Gemini/);
+    assert.ok(items[0].backgroundColor);
+    bar.update(v, { compact: true, show: false });
+    assert.equal(items[0].visible, false);
+    bar.update(v, { compact: true, hidden: ['antigravity'] });
+    assert.equal(items[0].visible, false);
 });
 
 test('old Codex records keep real values and reset time without a yellow idle warning; read errors still warn', () => {

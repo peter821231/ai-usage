@@ -22,7 +22,8 @@
 
 預設選取 Gemini **5-hour / Weekly（5 小時／每週）** 及 **Argon Weekly（Argon 每週）**。
 可在設定中加入 Claude/GPT；滑鼠懸停提示與儀表板仍會顯示完整額度。
-狀態列寬度由 IDE 與其他擴充套件共用，請依視窗寬度選擇要顯示的摘要。
+在 **設定 → 狀態列 → 精簡模式** 勾選後，狀態列只顯示一個額度儀表。
+將滑鼠移到圖示上可查看完整額度，點一下可開啟儀表板。
 
 ### 詳細儀表板
 
@@ -173,6 +174,7 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 - `refresh.pauseWhenUnfocused`：在背景時暫停定期檢查。
 - `context.show`：可選的對話脈絡區塊，預設關閉。
 - `statusBar.show`，以及各服務的 `enable` 與 `showInStatusBar`。未設定 `showInStatusBar` 時，讀到額度或支出資料後，該服務會自動顯示。手動設定優先。
+- `statusBar.compact`：只顯示額度儀表圖示，預設關閉。
 - `antigravity.statusBar.*` 下的 `geminiFiveHour`、`geminiWeekly`、`argonWeekly` 預設開啟；`claudeGptFiveHour`、`claudeGptWeekly` 預設關閉。
 - `claudeCode.timeoutSeconds`：15、30、45（預設）或 60 秒。
 - `claudeCode.enterpriseResetSchedule`：`monthlyUtc`（已驗證的每月 UTC 規則）或 `unknown`（僅採用來源）。依規則推算的日期會明確標示。
@@ -184,7 +186,7 @@ Antigravity 摘要會顯示所選週期名稱，包含數值為 Unknown 的項�
 
 狀態列空間由 IDE 與其他擴充套件共用，能顯示多少內容取決於寬度、字型／縮放比例及其他項目。
 此擴充套件不宣稱有固定的字元數上限，也不會默默截斷數值。請選擇需要的摘要。
-懸停提示與儀表板設定會明確說明，狀態列僅顯示部分資訊。
+懸停提示會為每筆額度顯示燈號、分段進度條、百分比和重設時間。已使用 75% 時轉黃、90% 時轉紅，未知讀值標為白色。
 完整設定及 Codex 舊記錄與讀取失敗的差異，請參閱 [0.1.6 狀態列選項（英文）](docs/status-bar-0.1.6.md)。
 
 Codex 的 **Last recorded** 描述的是本機舊事件，不代表剛成功完成即時查詢。
