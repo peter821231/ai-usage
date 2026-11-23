@@ -95,7 +95,7 @@ generate a template and add another language.
   is never hard-coded to USD 200. The display describes account usage; it does
   not claim a separate Claude-Code-only bill.
 - **Codex:** account rate limits and reset times from the official Codex App
-  Server. Local session logs provide a fallback with the event's original time.
+  Server, including while Codex is idle. Local session logs provide a fallback.
 - Compact AG / CC / CX provider cards with inline quota bars and reset countdowns;
   cards can collapse and retain their state after refresh or webview reload.
   Reduced header padding, row heights and section spacing keep more usage visible
@@ -151,7 +151,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 |---|---|---|
 | Antigravity | Local loopback quota summary; existing process discovery and local session token | Check about once a minute; summary queries are cached for two minutes. Mark stale after five minutes without a successful summary. Time is labelled **Fetched**, not a backend event timestamp. |
 | Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
-| Codex | Official Codex App Server with local session events as a fallback | Query at the refresh interval (one minute by default) and on manual refresh. Successful account queries show **Fetched**. Old session events show **Last recorded** with their original values and timestamps. |
+| Codex | Official Codex App Server with local session events as a fallback | Query at the refresh interval (one minute by default) and on manual refresh. A manual refresh can query Codex while the other providers are still checking. |
 
 If the bundled Claude Code CLI cannot start, AI Usage can try the official native
 install location in the same host (`~/.local/bin/claude` on macOS/Linux or
@@ -169,8 +169,16 @@ For Codex, AI Usage queries `account/rateLimits/read` over local standard input
 and output. The official executable manages sign-in, and the query runs without
 a conversation or model request. AI Usage retains the quota fields needed for
 display. See the [Codex App Server documentation](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
-On Windows, AI Usage needs the bundled executable or `codex.exe` on `PATH`.
-Diagnostics reports App Server failures even when session data is available.
+
+AI Usage can use the official extension's bundled CLI on macOS with Apple
+silicon or Intel. On Windows, it uses the bundled executable or `codex.exe`
+on `PATH`.
+
+In the Codex card, **Source & reset details** shows **Fetched** for successful
+App Server reads. AI Usage reads the local session logs when a live reading is
+unavailable or when context display is enabled. A fallback reading shows the
+original **Source event** time. **Show Diagnostics** reports App Server
+failures even when the panel can display a session reading.
 
 Antigravity discovery does access its local session token in memory, and local
 log parsing reads file tails to extract the needed events. It would be
@@ -268,12 +276,10 @@ red at 90% used, and a white dot marks an unknown reading.
 See [0.1.6 status-bar choices](docs/status-bar-0.1.6.md) for the exact settings and
 the distinction between recorded Codex data and read failures.
 
-Codex **Last recorded** describes an old local event, not a successful new live
-query. Its source time is never refreshed merely by reading the log. Age or an
-elapsed reset alone does not turn the status item yellow; the elapsed reset still
-shows pending in details and usage is never auto-zeroed. A Codex read error keeps
-the last values, marks the error and still uses the warning background. Other
-providers retain their existing missing/error/stale indications.
+Codex shows **Last recorded** for an old local event and preserves its original
+values and timestamp. If the event's reset time has passed, the card shows
+**Pending** and retains the observed usage. A Codex refresh error shows a warning
+when the panel has to retain its previous reading or has no reading to display.
 
 ## Develop and verify
 
