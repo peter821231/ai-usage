@@ -165,7 +165,7 @@
             el(
                 'p',
                 'detail',
-                `${t(p.id === 'codex' ? 'source.event' : 'source.fetched')}: ${stamp(sourceTime(p))} · ${state.timeZone || 'Asia/Taipei'}`
+                `${t(p.sourceTimeKey || 'source.fetched')}: ${stamp(sourceTime(p))} · ${state.timeZone || 'Asia/Taipei'}`
             )
         );
         for (const g of p.groups)

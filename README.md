@@ -12,7 +12,14 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## UI preview — 0.1.19
+## 0.1.20 preview
+
+AI Usage now fetches Codex account limits from the official Codex App Server
+even when no conversation is active. It checks once a minute by default and
+also supports manual refresh. Local session records are available as a
+fallback. [Changelog](CHANGELOG.md)
+
+## UI preview
 
 Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
 Hover over it for grouped limits, status dots, larger progress segments, and
@@ -20,8 +27,9 @@ reset times. Click the gauge to open the dashboard.
 
 ![AI Usage 0.1.19 compact status bar and grouped hover with demo data for Antigravity, Claude Enterprise, and Codex](docs/images/v0.1.19-compact-hover-demo.png)
 
-The preview uses demo values. The maintainer verified the larger segments and
-compact mode in the IDE on 2026-11-18 using the Traditional Chinese interface.
+The screenshot comes from 0.1.19 and uses demo values. The maintainer verified
+the larger segments and compact mode in the IDE on 2026-11-18 using the
+Traditional Chinese interface.
 
 ## Earlier UI preview — 0.1.6
 
@@ -94,8 +102,8 @@ generate a template and add another language.
   budget percentage through the installed official Claude Code CLI. The limit
   is never hard-coded to USD 200. The display describes account usage; it does
   not claim a separate Claude-Code-only bill.
-- **Codex:** 5-hour and weekly rate-limit events from local session logs, with
-  the event's original time. Reading a log again does not make its data newer.
+- **Codex:** account rate limits and reset times from the official Codex App
+  Server, including while Codex is idle. Local session logs provide a fallback.
 - Compact AG / CC / CX provider cards with inline quota bars and reset countdowns;
   cards can collapse and retain their state after refresh or webview reload.
   Reduced header padding, row heights and section spacing keep more usage visible
@@ -136,7 +144,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 |---|---|
 | Antigravity | Run and sign in to Antigravity IDE or its official editor integration. AI Usage needs a reachable Antigravity language server that can return quota data. |
 | Claude | Install the official Claude Code extension (`anthropic.claude-code`) in the IDE host and sign in to the Claude account or Team workspace you want to monitor. Standalone Claude Desktop sign-in is outside the supported setup. |
-| Codex | Use the official Codex integration in the host. An eligible local session must write a rate-limit event under the default `~/.codex/sessions` directory. The dashboard shows the most recent event it finds, with its original time. |
+| Codex | Sign in to ChatGPT with the official Codex extension or CLI in this host. AI Usage looks for the extension's bundled executable or a Codex executable on the host's `PATH`. Session fallback reads the default `~/.codex/sessions` directory. |
 
 ## Install and compare
 
@@ -151,7 +159,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 |---|---|---|
 | Antigravity | Local loopback quota summary; existing process discovery and local session token | Check about once a minute; summary queries are cached for two minutes. Mark stale after five minutes without a successful summary. Time is labelled **Fetched**, not a backend event timestamp. |
 | Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
-| Codex | Rate-limit events in local `~/.codex/sessions` logs | Check about once a minute; old events are labelled **Last recorded** in neutral styling, retaining their real timestamps and values. Read errors still warn. Other devices may have newer usage. |
+| Codex | Official Codex App Server with local session events as a fallback | Query at the refresh interval (one minute by default) and on manual refresh. A manual refresh can query Codex while the other providers are still checking. |
 
 If the bundled Claude Code CLI cannot start, AI Usage can try the official native
 install location in the same host (`~/.local/bin/claude` on macOS/Linux or
@@ -164,6 +172,21 @@ The official CLI owns authentication. It is queried with `initialize` and
 folder, with an empty strict MCP configuration and no session persistence.
 The control protocol is internal and can change with CLI updates. Global CLI
 settings and authentication still belong to the official tool.
+
+For Codex, AI Usage queries `account/rateLimits/read` over local standard input
+and output. The official executable manages sign-in, and the query runs without
+a conversation or model request. AI Usage retains the quota fields needed for
+display. See the [Codex App Server documentation](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
+
+AI Usage can use the official extension's bundled CLI on macOS with Apple
+silicon or Intel. On Windows, it uses the bundled executable or `codex.exe`
+on `PATH`.
+
+In the Codex card, **Source & reset details** shows **Fetched** for successful
+App Server reads. AI Usage reads the local session logs when a live reading is
+unavailable or when context display is enabled. A fallback reading shows the
+original **Source event** time. **Show Diagnostics** reports App Server
+failures even when the panel can display a session reading.
 
 Antigravity discovery does access its local session token in memory, and local
 log parsing reads file tails to extract the needed events. It would be
@@ -261,12 +284,10 @@ red at 90% used, and a white dot marks an unknown reading.
 See [0.1.6 status-bar choices](docs/status-bar-0.1.6.md) for the exact settings and
 the distinction between recorded Codex data and read failures.
 
-Codex **Last recorded** describes an old local event, not a successful new live
-query. Its source time is never refreshed merely by reading the log. Age or an
-elapsed reset alone does not turn the status item yellow; the elapsed reset still
-shows pending in details and usage is never auto-zeroed. A Codex read error keeps
-the last values, marks the error and still uses the warning background. Other
-providers retain their existing missing/error/stale indications.
+Codex shows **Last recorded** for an old local event and preserves its original
+values and timestamp. If the event's reset time has passed, the card shows
+**Pending** and retains the observed usage. A Codex refresh error shows a warning
+when the panel has to retain its previous reading or has no reading to display.
 
 ## Develop and verify
 

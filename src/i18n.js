@@ -31,7 +31,7 @@ function localizeView(view, i18n) {
         i18n: i18n.bundle,
         providers: view.providers.map((provider) => ({
             ...provider,
-            source: t(`source.${provider.id}`),
+            source: t(provider.sourceKey || `source.${provider.id}`),
             error: provider.errorKey ? t(provider.errorKey) : provider.error,
             notice: provider.noticeKey ? t(provider.noticeKey) : provider.notice,
             plan: provider.plan === 'Unknown' ? t('common.unknown') : provider.plan,

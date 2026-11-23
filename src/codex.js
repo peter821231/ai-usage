@@ -114,6 +114,26 @@ function buildCodexLimits(parsed) {
     return { windows, plan: typeof l.rl.plan_type === 'string' ? l.rl.plan_type.slice(0, 40) : '', credits, at: l.ts };
 }
 
+function buildCodexAppLimits(result, fetchedAt) {
+    const snapshot = result?.rateLimitsByLimitId?.codex ?? result?.rateLimits;
+    if (!snapshot || (snapshot.limitId != null && snapshot.limitId !== 'codex')) return null;
+    const windows = [snapshot.primary, snapshot.secondary]
+        .filter(Boolean)
+        .map((w) => limitWindow({
+            used_percent: w.usedPercent,
+            window_minutes: w.windowDurationMins,
+            resets_at: w.resetsAt
+        }, fetchedAt))
+        .filter(Boolean);
+    if (!windows.length) return null;
+    return {
+        windows,
+        plan: typeof snapshot.planType === 'string' ? snapshot.planType.slice(0, 40) : '',
+        source: 'app-server',
+        at: fetchedAt
+    };
+}
+
 async function sortedDirs(dir) {
     try {
         return (await fsp.readdir(dir, { withFileTypes: true }))
@@ -226,4 +246,4 @@ class CodexReader {
     }
 }
 
-module.exports = { CodexReader, parseCodexLines, buildCodexContext, buildCodexLimits, windowName };
+module.exports = { CodexReader, parseCodexLines, buildCodexContext, buildCodexLimits, buildCodexAppLimits, windowName };
