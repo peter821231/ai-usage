@@ -6,6 +6,7 @@ const path = require('node:path');
 const cfg = require('./config');
 const { AgyClient } = require('./agyClient');
 const { CodexReader } = require('./codex');
+const { findCodexCommand, fetchCodexLimits } = require('./codexAppServer');
 const { ClaudeContextReader } = require('./claudeCode');
 const { bundledCliPath, nativeCliPath, fetchHostUsage } = require('./claudeUsageCli');
 const { parseUsage } = require('./claudeUsage');
@@ -85,7 +86,9 @@ class Monitor {
     }
     refresh(force = false) {
         if (this.disposed) return Promise.resolve();
-        if (this.inFlight) return this.inFlight;
+        if (this.inFlight) {
+            return force ? Promise.all([this.inFlight, this.readCodex()]).then(() => undefined) : this.inFlight;
+        }
         this.inFlight = Promise.allSettled([this.readAntigravity(), this.readCodex(), this.readClaude(force)])
             .then(() => this.render())
             .finally(() => {
@@ -124,18 +127,46 @@ class Monitor {
         s.checkedAt = Date.now();
         this.render();
     }
-    async readCodex() {
+    readCodex() {
         if (!cfg.get('codex.enable', true)) return;
-        const s = this.snapshots.codex;
-        try {
-            const data = await this.codex.read(this.paths());
-            if (data?.limits) {
-                s.data = data;
-                s.error = '';
-            } else s.error = 'codex-no-event';
-        } catch {
-            s.error = 'codex-read-failed';
+        if (!this.codexInFlight) {
+            this.codexInFlight = this.updateCodex().finally(() => {
+                this.codexInFlight = null;
+            });
         }
+        return this.codexInFlight;
+    }
+    async updateCodex() {
+        const s = this.snapshots.codex;
+        const official = vscode.extensions.getExtension('openai.chatgpt');
+        const command = findCodexCommand(official?.extensionPath);
+        let live;
+        let appServerError = '';
+        try {
+            live = await fetchCodexLimits({ command, cwd: this.home, signal: this.abort.signal });
+        } catch {
+            appServerError = 'codex-query-failed';
+        }
+        if (this.disposed) return;
+        let local;
+        let localError = '';
+        const showContext = cfg.get('context.show', false);
+        if (!live || showContext) {
+            try {
+                local = await this.codex.read(this.paths());
+            } catch {
+                localError = 'codex-read-failed';
+            }
+        }
+        if (this.disposed) return;
+
+        const recorded = local?.limits;
+        const previous = s.data?.limits;
+        const preferPrevious = previous?.source === 'app-server' && (!recorded || previous.at >= recorded.at);
+        const limits = live || (preferPrevious ? previous : recorded);
+        if (limits) s.data = { limits, context: showContext ? local?.context || null : null };
+        s.appServerError = appServerError;
+        s.error = live || (recorded && !preferPrevious) ? '' : appServerError || localError || 'codex-no-event';
         s.checkedAt = Date.now();
         this.render();
     }
@@ -214,6 +245,7 @@ class Monitor {
     }
     diagnostics() {
         const official = vscode.extensions.getExtension('anthropic.claude-code');
+        const codex = vscode.extensions.getExtension('openai.chatgpt');
         const report = {
             platform: process.platform,
             remoteName: vscode.env.remoteName || 'local',
@@ -221,12 +253,16 @@ class Monitor {
             officialClaudeVersion: official?.packageJSON.version || null,
             officialCliPresent: !!official && fs.existsSync(bundledCliPath(official.extensionPath)),
             nativeCliPresent: fs.existsSync(nativeCliPath(this.home)),
+            codexCliPresent: !!findCodexCommand(codex?.extensionPath),
             codexLogsPresent: fs.existsSync(path.join(this.home, '.codex', 'sessions')),
             antigravityConnected: !!this.agy.server,
             sources: Object.fromEntries(
                 Object.entries(this.snapshots).map(([id, s]) => [
                     id,
-                    { hasData: !!s.data, checkedAt: s.checkedAt || null, error: s.error || '' }
+                    {
+                        hasData: !!s.data, checkedAt: s.checkedAt || null, error: s.error || '',
+                        ...(id === 'codex' ? { appServerError: s.appServerError || '' } : {})
+                    }
                 ])
             )
         };

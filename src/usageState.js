@@ -32,6 +32,7 @@ const ERROR_KEYS = {
     'agy-unavailable': 'error.agy.unavailable',
     'codex-no-event': 'error.codex.noEvent',
     'codex-read-failed': 'error.codex.read',
+    'codex-query-failed': 'error.codex.query',
     'cache-unavailable': 'error.cache',
     // Compatibility with earlier in-memory errors and cached spend issues.
     'Quota summary is unavailable': 'error.agy.summary',
@@ -214,6 +215,7 @@ function claudeView(snapshot = {}, now = Date.now(), resetPolicy = 'monthlyUtc')
 
 function codexView(snapshot = {}, now = Date.now()) {
     const limits = snapshot.data?.limits;
+    const live = limits?.source === 'app-server';
     const timing = { ...snapshot, observedAt: limits?.at || null };
     const windows = [...(limits?.windows || [])];
     for (const name of ['5-hour', 'Weekly'])
@@ -221,7 +223,8 @@ function codexView(snapshot = {}, now = Date.now()) {
     return {
         id: 'codex',
         title: 'Codex',
-        source: 'Local Codex session rate-limit event',
+        sourceKey: live ? 'source.codexAppServer' : 'source.codex',
+        sourceTimeKey: live ? 'source.fetched' : 'source.event',
         groups: [
             {
                 id: 'codex',
@@ -232,7 +235,7 @@ function codexView(snapshot = {}, now = Date.now()) {
                     const reading = row(w.name, w.name, w.pct, w.resetsAt, timing, 5 * 60000, now);
                     return {
                         ...reading,
-                        recordedOnly: reading.usedPct !== null && !!reading.observedAt &&
+                        recordedOnly: !live && reading.usedPct !== null && !!reading.observedAt &&
                             ['age', 'reset-elapsed'].includes(reading.staleReason),
                         resetBasis: w.resetBasis || 'provider'
                     };

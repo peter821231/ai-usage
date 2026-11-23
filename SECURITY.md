@@ -5,11 +5,12 @@ security-reporting service. Report issues privately to the maintainer of your
 copy; do not attach tokens, Cookies, credential files, raw CLI output or complete
 session logs.
 
-The official Claude CLI owns authentication. The monitor does not open Claude
-credential files, perform sign-in, refresh tokens itself or send model prompts.
-Antigravity discovery uses a local session token in memory to talk to loopback;
-Codex and optional context readers inspect local log tails. The extension is not
-an assertion that those sources are free of sensitive data.
+The official Claude and Codex executables own authentication. The monitor uses
+Codex App Server's account rate-limit read over local standard input and output.
+It leaves credential files, sign-in and token refresh to the official tools.
+Antigravity discovery uses a local session token in memory to talk to loopback.
+The Codex monitor inspects local log tails for the fallback or when context
+display is enabled. Session logs can contain sensitive data.
 
 Normalized Claude usage is cached in this extension's storage, with restrictive
 file permissions where supported. Raw CLI stdout/stderr and account identifiers

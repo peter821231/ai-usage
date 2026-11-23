@@ -94,8 +94,8 @@ generate a template and add another language.
   budget percentage through the installed official Claude Code CLI. The limit
   is never hard-coded to USD 200. The display describes account usage; it does
   not claim a separate Claude-Code-only bill.
-- **Codex:** 5-hour and weekly rate-limit events from local session logs, with
-  the event's original time. Reading a log again does not make its data newer.
+- **Codex:** account rate limits and reset times from the official Codex App
+  Server. Local session logs provide a fallback with the event's original time.
 - Compact AG / CC / CX provider cards with inline quota bars and reset countdowns;
   cards can collapse and retain their state after refresh or webview reload.
   Reduced header padding, row heights and section spacing keep more usage visible
@@ -136,7 +136,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 |---|---|
 | Antigravity | Run and sign in to Antigravity IDE or its official editor integration. AI Usage needs a reachable Antigravity language server that can return quota data. |
 | Claude | Install the official Claude Code extension (`anthropic.claude-code`) in the IDE host and sign in to the Claude account or Team workspace you want to monitor. Standalone Claude Desktop sign-in is outside the supported setup. |
-| Codex | Use the official Codex integration in the host. An eligible local session must write a rate-limit event under the default `~/.codex/sessions` directory. The dashboard shows the most recent event it finds, with its original time. |
+| Codex | Sign in to ChatGPT with the official Codex extension or CLI in this host. AI Usage looks for the extension's bundled executable or a Codex executable on the host's `PATH`. Session fallback reads the default `~/.codex/sessions` directory. |
 
 ## Install and compare
 
@@ -151,7 +151,7 @@ The IDE must support VS Code extensions and satisfy the version range in
 |---|---|---|
 | Antigravity | Local loopback quota summary; existing process discovery and local session token | Check about once a minute; summary queries are cached for two minutes. Mark stale after five minutes without a successful summary. Time is labelled **Fetched**, not a backend event timestamp. |
 | Claude | Official Claude Code extension's bundled CLI or same-host native CLI fallback | Queries run about every five minutes. Manual requests are at least a minute apart and respect failure backoff. Mark data stale after ten minutes. Multiple windows in the same host share a query lease and cache. |
-| Codex | Rate-limit events in local `~/.codex/sessions` logs | Check about once a minute; old events are labelled **Last recorded** in neutral styling, retaining their real timestamps and values. Read errors still warn. Other devices may have newer usage. |
+| Codex | Official Codex App Server with local session events as a fallback | Query at the refresh interval (one minute by default) and on manual refresh. Successful account queries show **Fetched**. Old session events show **Last recorded** with their original values and timestamps. |
 
 If the bundled Claude Code CLI cannot start, AI Usage can try the official native
 install location in the same host (`~/.local/bin/claude` on macOS/Linux or
@@ -164,6 +164,13 @@ The official CLI owns authentication. It is queried with `initialize` and
 folder, with an empty strict MCP configuration and no session persistence.
 The control protocol is internal and can change with CLI updates. Global CLI
 settings and authentication still belong to the official tool.
+
+For Codex, AI Usage queries `account/rateLimits/read` over local standard input
+and output. The official executable manages sign-in, and the query runs without
+a conversation or model request. AI Usage retains the quota fields needed for
+display. See the [Codex App Server documentation](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
+On Windows, AI Usage needs the bundled executable or `codex.exe` on `PATH`.
+Diagnostics reports App Server failures even when session data is available.
 
 Antigravity discovery does access its local session token in memory, and local
 log parsing reads file tails to extract the needed events. It would be

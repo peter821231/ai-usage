@@ -15,6 +15,10 @@ test('activation wires isolated commands; updates all three providers without to
         dispose() {}
     };
     let codexLimits = null;
+    let codexAppLimits = null;
+    let codexAppError = false;
+    let codexSessionReads = 0;
+    let antigravityPending;
     let provider;
     let receiver;
     let configurationChanged;
@@ -75,6 +79,7 @@ test('activation wires isolated commands; updates all three providers without to
             return { email: 'private@example.com', planName: 'Pro' };
         }
         async getLimits() {
+            await antigravityPending;
             this.limitsFetchedAt = Date.now();
             return [{ id: 'argon', name: 'Gemini 4 Argon', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 93 }] }];
         }
@@ -86,8 +91,16 @@ test('activation wires isolated commands; updates all three providers without to
         './codex': {
             CodexReader: class {
                 async read() {
+                    codexSessionReads++;
                     return codexLimits && { limits: codexLimits };
                 }
+            }
+        },
+        './codexAppServer': {
+            findCodexCommand: () => '/fixture/codex',
+            fetchCodexLimits: async () => {
+                if (codexAppError) throw Error('private diagnostic');
+                return codexAppLimits;
             }
         },
         './claudeUsageStore': {
@@ -174,6 +187,42 @@ test('activation wires isolated commands; updates all three providers without to
         await monitor.refresh();
         assert.match(barItem.text, /Codex 5h 0%/);
 
+        const liveAt = Date.now() - 1000;
+        codexAppLimits = { at: liveAt, source: 'app-server', windows: [{ name: '5-hour', pct: 12 }] };
+        codexLimits = { at: liveAt - 1000, windows: [{ name: '5-hour', pct: 30 }] };
+        const previousSessionReads = codexSessionReads;
+        await monitor.onMessage({ type: 'refresh' });
+        assert.equal(codexSessionReads, previousSessionReads);
+        const codexProvider = () => posted.at(-1).state.providers.find((p) => p.id === 'codex');
+        assert.match(barItem.text, /Codex 5h 12%/);
+        assert.equal(codexProvider().source, 'Official Codex App Server · account limits');
+        assert.equal(codexProvider().sourceTimeKey, 'source.fetched');
+        codexAppError = true;
+        await monitor.refresh();
+        assert.match(barItem.text, /Codex 5h 12%/);
+        assert.equal(codexProvider().groups[0].rows[0].observedAt, liveAt);
+        assert.match(codexProvider().error, /Could not query account limits/);
+        codexLimits = { ...codexLimits, at: liveAt + 1 };
+        await monitor.refresh();
+        assert.match(barItem.text, /Codex 5h 30%/);
+        assert.equal(codexProvider().sourceTimeKey, 'source.event');
+        assert.equal(codexProvider().error, '');
+        const codexDiagnostics = monitor.diagnostics().sources.codex;
+        assert.equal(codexDiagnostics.appServerError, 'codex-query-failed');
+        assert.equal(codexDiagnostics.error, '');
+
+        codexAppError = false;
+        let unblockAntigravity;
+        antigravityPending = new Promise((resolve) => { unblockAntigravity = resolve; });
+        const slowRefresh = monitor.refresh();
+        await monitor.readCodex();
+        codexAppLimits = { ...codexAppLimits, windows: [{ name: '5-hour', pct: 17 }] };
+        const manualRefresh = monitor.onMessage({ type: 'refresh' });
+        await monitor.readCodex();
+        assert.match(barItem.text, /Codex 5h 17%/);
+        unblockAntigravity();
+        await Promise.all([slowRefresh, manualRefresh]);
+
         await monitor.onMessage({ type: 'setSetting', key: 'antigravity.statusBar.argonWeekly', value: false });
         monitor.render();
         assert.equal(settings.get('antigravity.statusBar.argonWeekly'), false);
@@ -208,6 +257,7 @@ test('activation wires isolated commands; updates all three providers without to
         receiver({ type: 'signIn' });
         await commands.get('nexusAiUsage.showDiagnostics')();
         assert.doesNotMatch(logs.join(''), /private@example/);
+        assert.doesNotMatch(logs.join(''), /private diagnostic/);
     } finally {
         monitor?.dispose();
         for (const d of context.subscriptions) d.dispose();

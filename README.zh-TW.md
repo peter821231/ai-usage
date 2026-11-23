@@ -77,7 +77,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 - **Antigravity**：Gemini Models 的 5 小時及每週額度、Claude 與 GPT 模型的 5 小時及每週額度，以及 Gemini 4 Argon 的每週額度。即使用量百分比與重設時間相同，也會保留完整的群組識別資訊。
 - **Claude Pro / Max 與 Team（合成資料測試）**：顯示來源提供的 5 小時、每週及個別模型額度，各自保有重設時間。即使啟用額外用量，狀態列、展開卡片及收合預覽仍以訂閱額度為主。額外支出放在獨立的預算區塊；缺少的數值維持 **Unknown（未知）**。
 - **Claude Enterprise**：透過已安裝的官方 Claude Code CLI，取得實際帳戶支出、來源提供的上限、剩餘金額及預算使用百分比。上限不會寫死為 200 美元。畫面描述的是帳戶用量，不宣稱這是一份僅計算 Claude Code 的獨立帳單。
-- **Codex**：從本機工作階段記錄檔讀取 5 小時與每週的額度限制事件，保留事件原始時間。重新讀取記錄檔不會讓資料變成最新。
+- **Codex**：向官方 Codex App Server 查詢帳戶額度與重設時間。本機工作階段記錄可供備援，並保留事件的原始時間。
 - 精簡的 AG / CC / CX 服務卡片，內含額度長條圖與重設倒數；卡片可收合，並在重新整理或重新載入網頁檢視後保留收合狀態。縮小標頭留白、列高與區塊間距，讓側邊欄能顯示更多用量，同時保留額度標籤、重設資訊，以及分開呈現的預算與對話脈絡。完整來源時間與確切重設時間，仍可在各卡片的 **Source & reset details（來源與重設詳細資訊）** 中展開檢視。模型標籤與 Antigravity 內部點數欄位無須額外查詢即可讀取；點數欄位的意義與尺度尚未和官方用量介面核對，不能視為已確認的可用額度。
 - 狀態列的懸停提示提供精簡用量圖表，以及已用／剩餘數值。
 - Antigravity 狀態摘要預設顯示 **Gemini Models 5-hour / Weekly** 及獨立的 **Gemini 4 Argon Weekly**。五個布林選項可分別選擇是否顯示各週期；僅影響摘要，不影響完整懸停提示或儀表板。
@@ -95,7 +95,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 | --- | --- |
 | Antigravity | 啟動並登入 Antigravity IDE 或官方編輯器整合。AI Usage 需要連到可回傳額度的 Antigravity 語言伺服器。 |
 | Claude | 在該 IDE 主機安裝官方 Claude Code 擴充套件（`anthropic.claude-code`），並登入要監看的 Claude 帳戶或 Team 工作區。僅登入 Claude Desktop 的環境不在支援範圍。 |
-| Codex | 在同一主機使用官方 Codex 整合，並讓本機工作階段在預設的 `~/.codex/sessions` 寫入額度限制事件。面板會顯示讀到的最新事件及原始時間。 |
+| Codex | 在同一主機以官方 Codex 擴充套件或 CLI 登入 ChatGPT。AI Usage 會尋找隨擴充套件附帶或位於主機 `PATH` 上的 Codex 執行檔。工作階段備援讀取預設的 `~/.codex/sessions`。 |
 
 ## 安裝與比對
 
@@ -110,7 +110,7 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 | --- | --- | --- |
 | Antigravity | 本機回送位址上的額度摘要；沿用既有的程序探索方式與本機工作階段權杖 | 約每分鐘檢查一次；摘要查詢快取兩分鐘。超過五分鐘未成功取得摘要即標示為過時。時間標示為 **Fetched（擷取時間）**，並非後端事件時間戳記。 |
 | Claude | 官方 Claude Code 擴充套件內附的 CLI，或同一主機的官方原生 CLI 備援 | 約每五分鐘查詢一次。手動查詢至少間隔一分鐘，失敗後會逐步延長重試間隔。讀數超過十分鐘會標示為過時。同一主機的多個視窗共用查詢租約與快取。 |
-| Codex | 本機 `~/.codex/sessions` 記錄檔中的額度限制事件 | 約每分鐘檢查一次；舊事件以中性樣式標示 **Last recorded（最近記錄）**，保留真實時間戳記與數值。讀取錯誤仍會警示。其他裝置可能有較新的用量。 |
+| Codex | 官方 Codex App Server，以本機工作階段事件備援 | 按刷新間隔（預設 1 分鐘）及手動重新整理時查詢。帳戶查詢成功會顯示 **Fetched（擷取時間）**，較舊的工作階段事件以 **Last recorded（最近記錄）** 顯示原始時間及數值。 |
 
 若 Claude Code 擴充套件內附的 CLI 無法啟動，AI Usage 會嘗試同一主機的官方原生安裝位置（macOS／Linux 為 `~/.local/bin/claude`，Windows 為 `%USERPROFILE%\.local\bin\claude.exe`）。**Diagnostics（診斷）**會顯示兩處是否有執行檔。[Claude Code 官方安裝疑難排解](https://code.claude.com/docs/en/troubleshoot-install)
 
@@ -118,6 +118,12 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 身分驗證由官方 CLI 處理。工具會在擴充套件自己的儲存資料夾中，使用 `initialize` 與 `get_usage` 查詢，
 不傳送模型提示詞，並使用空白的嚴格 MCP 設定，也不儲存工作階段。
 這是內部控制通訊協定，可能隨 CLI 更新而改變。全域 CLI 設定與身分驗證仍由官方工具管理。
+
+AI Usage 透過本機標準輸入與輸出向 Codex 呼叫 `account/rateLimits/read`。
+登入由官方執行檔處理，查詢不需開啟對話或送出模型請求。插件只保留顯示所需的額度欄位。
+請參閱 [Codex App Server 文件](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt)。
+Windows 需要使用擴充套件內附的執行檔，或位於 `PATH` 上的 `codex.exe`。
+使用工作階段紀錄備援時，診斷資訊仍會顯示 App Server 查詢錯誤。
 
 Antigravity 程序探索會存取記憶體中的本機工作階段權杖；
 本機記錄解析則會讀取檔案尾端，擷取所需事件。因此，不能宣稱此擴充套件完全不會接觸本機敏感資料。

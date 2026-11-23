@@ -1,5 +1,11 @@
 # AI Usage changelog
 
+## 0.1.20 — 2026-11-23 (Preview)
+
+- Query current Codex account limits through the official Codex App Server
+  during refresh, including when no conversation is active.
+- Use local session records as a fallback and preserve their original timestamps.
+
 ## 0.1.19 — 2026-11-18 (Preview)
 
 - Group quota windows in the hover with a status dot, a progress bar with larger
