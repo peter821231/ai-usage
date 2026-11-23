@@ -12,7 +12,14 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## UI preview — 0.1.19
+## 0.1.20 preview
+
+AI Usage now fetches Codex account limits from the official Codex App Server
+even when no conversation is active. It checks once a minute by default and
+also supports manual refresh. Local session records are available as a
+fallback. [Changelog](CHANGELOG.md)
+
+## UI preview
 
 Turn on **Settings → Status Bar → Compact mode** to show a single quota gauge.
 Hover over it for grouped limits, status dots, larger progress segments, and
@@ -20,8 +27,9 @@ reset times. Click the gauge to open the dashboard.
 
 ![AI Usage 0.1.19 compact status bar and grouped hover with demo data for Antigravity, Claude Enterprise, and Codex](docs/images/v0.1.19-compact-hover-demo.png)
 
-The preview uses demo values. The maintainer verified the larger segments and
-compact mode in the IDE on 2026-11-18 using the Traditional Chinese interface.
+The screenshot comes from 0.1.19 and uses demo values. The maintainer verified
+the larger segments and compact mode in the IDE on 2026-11-18 using the
+Traditional Chinese interface.
 
 ## Earlier UI preview — 0.1.6
 
