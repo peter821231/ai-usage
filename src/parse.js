@@ -62,27 +62,35 @@ function slug(s) {
     );
 }
 
+function uniqueId(ids, base) {
+    let id = base;
+    let suffix = ids.get(base) || 0;
+    while (ids.has(id)) id = `${base}-${++suffix}`;
+    ids.set(id, 0);
+    ids.set(base, suffix);
+    return id;
+}
+
 // Model observations are distinct unless the provider explicitly identifies a shared pool.
 function parseUserStatus(raw) {
     const us = raw && raw.userStatus;
-    if (!us) return null;
+    if (!us || typeof us !== 'object' || Array.isArray(us)) return null;
     const configs = us.cascadeModelConfigData?.clientModelConfigs;
-    const modelLabels = {};
+    const modelLabels = Object.create(null);
     const pools = [];
-    const ids = new Set();
+    const ids = new Map();
     for (const c of Array.isArray(configs) ? configs : []) {
         if (!c || typeof c !== 'object') continue;
         const label = str(c.label, 100);
-        const model = c.modelOrAlias && str(c.modelOrAlias.model, 200);
+        const model = str(c.modelOrAlias?.model, 200);
+        const modelId = str(c.modelId, 200);
         if (model && label) modelLabels[model] = label;
-        if (c.modelId && label) modelLabels[str(c.modelId, 200)] = label;
+        if (modelId && label) modelLabels[modelId] = label;
         const q = c.quotaInfo || {};
         const frac = num(q.remainingFraction);
         const resetTime = typeof q.resetTime === 'string' && !isNaN(Date.parse(q.resetTime)) ? q.resetTime : null;
         if (!label || (frac === null && !resetTime)) continue;
-        let id = slug(str(c.modelId, 200) || model || label);
-        while (ids.has(id)) id += '-x';
-        ids.add(id);
+        const id = uniqueId(ids, slug(modelId || model || label));
         pools.push({
             id,
             name: label,
@@ -188,7 +196,7 @@ function pickTrajectory(summaries, wsPaths) {
 // gemini-3.8-flash-n -> "Gemini 3.8 Flash": match a known label, else title-case the id.
 function prettyModel(raw, modelLabels) {
     if (!raw || typeof raw !== 'string') return null;
-    if (modelLabels && modelLabels[raw]) return modelLabels[raw];
+    if (modelLabels && Object.hasOwn(modelLabels, raw)) return modelLabels[raw];
     const s = raw.replace(/^models[/_-]/i, '').replace(/-n$/i, '');
     if (/^MODEL_PLACEHOLDER_/i.test(s)) return null;
     const words = s
@@ -260,28 +268,19 @@ function parseQuotaSummary(raw) {
     if ((!Array.isArray(groups) || !groups.length) && Array.isArray(r.buckets))
         groups = [{ displayName: 'Antigravity', buckets: r.buckets }];
     if (!Array.isArray(groups)) return null;
-    let malformed = false;
-    const usedIds = new Set();
+    const usedIds = new Map();
     const out = [];
     for (const g of groups) {
-        if (!Array.isArray(g?.buckets)) {
-            malformed = true;
-            continue;
-        }
+        if (!Array.isArray(g?.buckets)) return null;
         const name = str(g.displayName, 100) || 'Models';
-        let id = str(g.id, 100) || str(g.groupId, 100) || slug(name);
-        while (usedIds.has(id)) id += '-x';
-        usedIds.add(id);
+        const id = uniqueId(usedIds, str(g.id, 100) || str(g.groupId, 100) || slug(name));
         const windows = [];
+        const usedWindowIds = new Map();
         for (const b of g.buckets) {
-            if (!b || typeof b !== 'object' || Array.isArray(b)) {
-                malformed = true;
-                continue;
-            }
+            if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
             if (b.disabled === true) continue;
             const wName = windowName(str(b.displayName, 100), str(b.window, 40));
-            let wid = str(b.id, 100) || `${id}-${slug(wName)}`;
-            while (windows.some((w) => w.id === wid)) wid += '-x';
+            const wid = uniqueId(usedWindowIds, str(b.id, 100) || `${id}-${slug(wName)}`);
             windows.push({
                 id: wid,
                 name: wName,
@@ -296,8 +295,7 @@ function parseQuotaSummary(raw) {
         windows.sort((a, b) => rank(a) - rank(b));
         if (windows.length) out.push({ id, name, windows });
     }
-    // Explicit empty bucket lists can replace old limits. Malformed empty summaries cannot.
-    return out.length || !malformed ? out : null;
+    return out;
 }
 
 // Only explicit identity can establish a relationship; matching values cannot.

@@ -21,6 +21,7 @@ test('activation wires isolated commands; updates all three providers without to
     let antigravityPending;
     const argon = { id: 'argon', name: 'Gemini 4 Argon', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 93 }] };
     let antigravityGroups = [argon];
+    let antigravityEmail = 'private@example.com';
     const officialAntigravity = { isActive: false, exports: { port: 1234, csrfToken: 'private fixture token' } };
     let provider;
     let receiver;
@@ -84,7 +85,7 @@ test('activation wires isolated commands; updates all three providers without to
             assert.equal(getOfficialApi(), officialAntigravity.exports);
         }
         async getStatus() {
-            return { email: 'private@example.com', planName: 'Pro' };
+            return { email: antigravityEmail, planName: 'Pro' };
         }
         async getLimits() {
             await antigravityPending;
@@ -279,6 +280,16 @@ test('activation wires isolated commands; updates all three providers without to
         assert.equal(antigravity().error, '');
         assert.match(antigravity().notice, /no active quota windows/);
         assert.doesNotMatch(barItem.text, /\bAG\b/);
+
+        antigravityEmail = '';
+        antigravityGroups = [argon];
+        await monitor.readAntigravity();
+        assert.equal(antigravity().groups[0].label, 'Gemini 4 Argon');
+        antigravityEmail = 'private@example.com';
+        antigravityGroups = null;
+        await monitor.readAntigravity();
+        assert.deepEqual(antigravity().groups, []);
+        assert.equal(monitor.snapshots.antigravity.observedAt, null);
 
         assert.equal(refreshes, 0, 'Changing compact mode must not query any provider');
         await monitor.onMessage({ type: 'setSetting', key: 'display.language', value: 'zh-TW' });

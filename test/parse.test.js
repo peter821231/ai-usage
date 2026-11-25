@@ -246,6 +246,19 @@ test('explicit empty quota lists differ from malformed lists', () => {
     }
 });
 
+test('duplicate source IDs stay unique and short in quota descriptions', () => {
+    const buckets = Array.from({ length: 500 }, () => ({ id: 'weekly', window: '604800s' }));
+    const groups = Array.from({ length: 500 }, () => ({ id: 'pool', buckets: [buckets[0]] }));
+    groups[0].buckets = buckets;
+    const result = p.parseQuotaSummary({ response: { groups } });
+    const groupIds = result.map(({ id }) => id);
+    const windowIds = result[0].windows.map(({ id }) => id);
+    for (const ids of [groupIds, windowIds]) {
+        assert.equal(new Set(ids).size, 500);
+        assert.ok(ids.every(id => id.length < 12));
+    }
+});
+
 test('group relationships require explicit identity rather than matching values', () => {
     const groups = [{ id: 'gemini', name: 'Gemini Models', windows: [{ remainingPct: 50 }] }];
     assert.strictEqual(p.limitsMatch([{ id: 'argon', name: 'Gemini 4 Argon', remainingPct: 50 }], groups), false);

@@ -36,6 +36,7 @@ function run(cmd, args, timeout = 6000) {
 }
 
 function rpc(port, csrf, name, body, timeout = 4000) {
+    let deadline;
     return new Promise((resolve, reject) => {
         const payload = JSON.stringify(body || {});
         const req = http.request(
@@ -44,7 +45,8 @@ function rpc(port, csrf, name, body, timeout = 4000) {
                 port,
                 path: RPC_PATH + name,
                 method: 'POST',
-                timeout,
+                // Keep the session token off any proxy configured for the extension host.
+                agent: false,
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(payload),
@@ -53,15 +55,24 @@ function rpc(port, csrf, name, body, timeout = 4000) {
                 }
             },
             (res) => {
+                res.on('error', reject);
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                    req.destroy();
+                    return;
+                }
                 const chunks = [];
                 let size = 0;
                 res.on('data', (c) => {
                     size += c.length;
-                    if (size > MAX_BODY_BYTES) return req.destroy(new Error('RESPONSE_TOO_LARGE'));
+                    if (size > MAX_BODY_BYTES) {
+                        reject(new Error('RESPONSE_TOO_LARGE'));
+                        req.destroy();
+                        return;
+                    }
                     chunks.push(c);
                 });
                 res.on('end', () => {
-                    if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
                     try {
                         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
                     } catch (e) {
@@ -71,9 +82,12 @@ function rpc(port, csrf, name, body, timeout = 4000) {
             }
         );
         req.on('error', reject);
-        req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
+        deadline = setTimeout(() => {
+            reject(new Error('TIMEOUT'));
+            req.destroy();
+        }, timeout);
         req.end(payload);
-    });
+    }).finally(() => clearTimeout(deadline));
 }
 
 async function listProcesses() {
@@ -112,6 +126,11 @@ function firstOk(promises) {
 }
 
 const NOOP_LOG = { info() {}, warn() {} };
+
+function sameConnection(previous, current) {
+    return !!previous && previous.kind === current.kind && previous.pid === current.pid
+        && previous.port === current.port && previous.csrf === current.csrf;
+}
 
 // Diagnostics never include the csrf token.
 class AgyClient {
@@ -244,20 +263,23 @@ class AgyClient {
         let data;
         if (official) {
             data = await rpc(official.port, official.csrf, 'GetUserStatus', META).catch(() => null);
-            this.server = data?.userStatus ? official : null;
-            if (!this.server) {
+            if (!data?.userStatus) {
+                this.server = null;
                 this.fail('IDE extension endpoint did not return user status');
                 return null;
             }
+            if (!sameConnection(this.server, official)) this.server = official;
         } else {
             data = await this.getProcessStatus();
             if (!data) return null;
         }
         const parsed = parseUserStatus(data);
         if (parsed) {
+            this.account = parsed.email.trim().toLowerCase();
             this.diag.lastOkAt = Date.now();
             this.diag.lastError = '';
         } else {
+            this.server = null;
             this.fail('server answered without user status');
         }
         return parsed;
@@ -267,10 +289,10 @@ class AgyClient {
     async getLimits(status) {
         const s = this.server;
         if (!s || !status) return null;
-        const key = `${s.kind || 'process'}|${s.pid || ''}|${s.port}|${String(status.email || '').toLowerCase()}`;
+        const account = status.email.trim().toLowerCase();
         const now = Date.now();
         const cached = this.limitsCache;
-        const c = cached?.key === key && cached.server.csrf === s.csrf ? cached : null;
+        const c = cached?.account === account && sameConnection(cached.server, s) ? cached : null;
         if (c && now - c.at < (c.error ? LIMITS_RETRY_MS : LIMITS_MIN_GAP_MS)) {
             this.limitsFetchedAt = c.fetchedAt;
             this.limitsError = c.error;
@@ -291,7 +313,7 @@ class AgyClient {
         } catch {
             error = 'Quota summary request failed';
         }
-        this.limitsCache = { key, server: s, at: now, fetchedAt, result, error };
+        this.limitsCache = { account, server: s, at: now, fetchedAt, result, error };
         this.limitsFetchedAt = fetchedAt;
         this.limitsError = error;
         this.diag.limits = error || 'available';
@@ -305,11 +327,11 @@ class AgyClient {
         const picked = pickTrajectory(traj && traj.trajectorySummaries, wsPaths);
         if (!picked) return null;
         const c = this.ctxCache;
-        if (c && c.id === picked.id && c.time === picked.time && c.server.port === s.port && c.server.csrf === s.csrf)
+        if (c && c.id === picked.id && c.time === picked.time && c.account === this.account && sameConnection(c.server, s))
             return c.result;
         const meta = await rpc(s.port, s.csrf, 'GetCascadeTrajectoryGeneratorMetadata', { cascade_id: picked.id });
         const result = parseGeneratorMetadata(meta, modelLabels, picked);
-        this.ctxCache = { id: picked.id, time: picked.time, server: s, result };
+        this.ctxCache = { id: picked.id, time: picked.time, account: this.account, server: s, result };
         return result;
     }
 }

@@ -210,6 +210,22 @@ test('unselected Antigravity windows do not color the selected summary', () => {
     assert.equal(items[0].visible, false);
 });
 
+test('source quota labels display as text even when they contain theme icon syntax', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    const provider = v.providers[0];
+    provider.groups.push({
+        id: 'new',
+        label: 'New $(warning)',
+        short: 'New $(warning)',
+        rows: [provider.groups[0].rows[0]]
+    });
+    bar.update(v, { antigravityWindows: { otherWindows: true } });
+    assert.match(items[0].text, /^\$\(dashboard\) .*New \\\$\(warning\)/);
+    assert.match(items[0].accessibilityInformation.label, /New \$\(warning\)/);
+});
+
 test('old Codex records keep real values and reset time without a yellow idle warning; read errors still warn', () => {
     const { StatusBar, items } = load();
     const bar = new StatusBar();

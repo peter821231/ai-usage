@@ -97,7 +97,7 @@ test('successful quota summaries replace cached pools while failed refreshes kee
         assert.equal(client.limitsError, '');
 
         client.limitsCache.at = 0;
-        response = { groups: [{ buckets: 'new unsupported format' }] };
+        response = { groups: [response.groups[0], { buckets: 'new unsupported format' }] };
         assert.deepEqual(await client.getLimits({ email: 'fixture' }), current);
         assert.ok(client.limitsError);
 

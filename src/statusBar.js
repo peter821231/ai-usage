@@ -143,7 +143,8 @@ class StatusBar {
         const label = visibleProviders.length
             ? `${visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')} · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}`
             : i18n.t('status.hidden');
-        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${label}`;
+        const text = label.replace(/(?<!\\)\$\([a-z0-9-]+(?:~[a-z]+)?\)/gi, '\\$&');
+        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${text}`;
         this.item.tooltip = hover(view);
         this.item.accessibilityInformation = { label };
         this.item.backgroundColor = visibleProviders.some((p) => p.id === 'codex' ? !!p.error : !!marker(p))

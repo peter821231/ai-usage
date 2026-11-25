@@ -6,6 +6,10 @@
   published by the active Google Antigravity extension.
 - Report the Antigravity connection method and a sanitized discovery error in
   Diagnostics.
+- Keep local Antigravity requests off the host proxy and bound the time spent
+  waiting for a response.
+- Retain the previous quota snapshot after malformed summaries and clear old
+  readings when the account changes.
 
 ## 0.1.21 — 2026-11-25 (Preview)
 
