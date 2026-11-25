@@ -28,7 +28,10 @@ class Monitor {
     constructor(context) {
         this.context = context;
         this.home = os.homedir();
-        this.agy = new AgyClient();
+        this.agy = new AgyClient(undefined, () => {
+            const official = vscode.extensions.getExtension('google.google-antigravity');
+            return official?.isActive ? official.exports : null;
+        });
         this.codex = new CodexReader(this.home);
         this.claudeContext = new ClaudeContextReader(this.home);
         this.bar = new StatusBar();
@@ -256,6 +259,8 @@ class Monitor {
             codexCliPresent: !!findCodexCommand(codex?.extensionPath),
             codexLogsPresent: fs.existsSync(path.join(this.home, '.codex', 'sessions')),
             antigravityConnected: !!this.agy.server,
+            antigravityConnection: this.agy.server ? this.agy.server.kind || 'legacy-process' : null,
+            antigravityDiscoveryError: this.agy.diag?.lastError || '',
             sources: Object.fromEntries(
                 Object.entries(this.snapshots).map(([id, s]) => [
                     id,

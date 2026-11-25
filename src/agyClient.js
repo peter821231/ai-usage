@@ -115,8 +115,9 @@ const NOOP_LOG = { info() {}, warn() {} };
 
 // Diagnostics never include the csrf token.
 class AgyClient {
-    constructor(log) {
+    constructor(log, getOfficialApi) {
         this.log = log || NOOP_LOG;
+        this.getOfficialApi = getOfficialApi;
         this.server = null;
         this.discovering = null;
         this.lastFailedDiscovery = 0;
@@ -199,7 +200,7 @@ class AgyClient {
                 this.fail(
                     procs.length
                         ? `found ${procs.length} process(es) but no port answered`
-                        : 'no agy or language server process found'
+                        : 'no compatible legacy Antigravity process found'
                 );
             }
             return found;
@@ -209,7 +210,18 @@ class AgyClient {
         return this.discovering;
     }
 
-    async getStatus() {
+    officialConnection() {
+        const api = this.getOfficialApi?.();
+        const port = api?.port;
+        const csrf = api?.csrfToken;
+        if (!Number.isInteger(port) || port < 1 || port > 65535 || typeof csrf !== 'string' || !csrf) return null;
+        const url = api.client?.serverUrl;
+        if (url && url !== `http://127.0.0.1:${port}` && url !== `http://localhost:${port}`) return null;
+        return { kind: 'ide-extension', port, csrf };
+    }
+
+    async getProcessStatus() {
+        if (this.server?.kind === 'ide-extension') this.server = null;
         let data = null;
         // Re-scan now and then: a newer agy session may be signed in to another account.
         if (this.server && Date.now() - this.lastDiscoveryAt > REDISCOVER_MS) {
@@ -224,10 +236,22 @@ class AgyClient {
                 this.server = null;
             }
         }
-        if (!data || !data.userStatus) {
-            const found = await this.discover();
-            if (!found) return null;
-            data = found.data;
+        return data?.userStatus ? data : (await this.discover())?.data;
+    }
+
+    async getStatus() {
+        const official = this.officialConnection();
+        let data;
+        if (official) {
+            data = await rpc(official.port, official.csrf, 'GetUserStatus', META).catch(() => null);
+            this.server = data?.userStatus ? official : null;
+            if (!this.server) {
+                this.fail('IDE extension endpoint did not return user status');
+                return null;
+            }
+        } else {
+            data = await this.getProcessStatus();
+            if (!data) return null;
         }
         const parsed = parseUserStatus(data);
         if (parsed) {
@@ -243,9 +267,10 @@ class AgyClient {
     async getLimits(status) {
         const s = this.server;
         if (!s || !status) return null;
-        const key = `${s.pid}|${String(status.email || '').toLowerCase()}`;
+        const key = `${s.kind || 'process'}|${s.pid || ''}|${s.port}|${String(status.email || '').toLowerCase()}`;
         const now = Date.now();
-        const c = this.limitsCache && this.limitsCache.key === key ? this.limitsCache : null;
+        const cached = this.limitsCache;
+        const c = cached?.key === key && cached.server.csrf === s.csrf ? cached : null;
         if (c && now - c.at < (c.error ? LIMITS_RETRY_MS : LIMITS_MIN_GAP_MS)) {
             this.limitsFetchedAt = c.fetchedAt;
             this.limitsError = c.error;
@@ -266,7 +291,7 @@ class AgyClient {
         } catch {
             error = 'Quota summary request failed';
         }
-        this.limitsCache = { key, at: now, fetchedAt, result, error };
+        this.limitsCache = { key, server: s, at: now, fetchedAt, result, error };
         this.limitsFetchedAt = fetchedAt;
         this.limitsError = error;
         this.diag.limits = error || 'available';
@@ -280,10 +305,11 @@ class AgyClient {
         const picked = pickTrajectory(traj && traj.trajectorySummaries, wsPaths);
         if (!picked) return null;
         const c = this.ctxCache;
-        if (c && c.id === picked.id && c.time === picked.time && c.port === s.port) return c.result;
+        if (c && c.id === picked.id && c.time === picked.time && c.server.port === s.port && c.server.csrf === s.csrf)
+            return c.result;
         const meta = await rpc(s.port, s.csrf, 'GetCascadeTrajectoryGeneratorMetadata', { cascade_id: picked.id });
         const result = parseGeneratorMetadata(meta, modelLabels, picked);
-        this.ctxCache = { id: picked.id, time: picked.time, port: s.port, result };
+        this.ctxCache = { id: picked.id, time: picked.time, server: s, result };
         return result;
     }
 }

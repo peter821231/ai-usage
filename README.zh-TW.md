@@ -10,10 +10,10 @@
 `nexus-ai-usage-local.nexus-ai-usage`，不會取代 Quota Nexus 或移轉其資料。
 這是非官方專案，與 Google、Anthropic 或 OpenAI 均無隸屬關係。
 
-## 0.1.21 預覽版
+## 0.1.22 預覽版
 
-Antigravity 現在依本機額度摘要顯示額度池。新池會自動出現，來源停止回報的時段會在成功更新後移除。
-開啟「其他額度時段」即可在狀態列顯示新增的時段。 [版本變更紀錄](CHANGELOG.md)
+AI Usage 透過已啟用的 Google Antigravity 擴充套件提供的本機連線讀取額度，包含 WSL 環境。
+額度池依本機摘要更新，開啟「其他額度時段」即可在狀態列顯示新偵測到的時段。 [版本變更紀錄](CHANGELOG.md)
 
 ## 介面預覽
 

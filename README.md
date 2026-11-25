@@ -12,11 +12,12 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## 0.1.21 preview
+## 0.1.22 preview
 
-Antigravity quota pools now follow the local quota summary. New pools appear
-automatically, and windows the source stops reporting disappear after a successful
-refresh. Turn on **Other quota windows** to include new windows in the status bar.
+AI Usage reads Antigravity quotas through the active Google Antigravity
+extension's loopback connection, including in WSL. Quota pools follow the
+local summary, and **Other quota windows** adds newly detected windows to
+the status bar.
 [Changelog](CHANGELOG.md)
 
 ## UI preview

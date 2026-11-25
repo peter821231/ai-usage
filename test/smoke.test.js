@@ -21,6 +21,7 @@ test('activation wires isolated commands; updates all three providers without to
     let antigravityPending;
     const argon = { id: 'argon', name: 'Gemini 4 Argon', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 93 }] };
     let antigravityGroups = [argon];
+    const officialAntigravity = { isActive: false, exports: { port: 1234, csrfToken: 'private fixture token' } };
     let provider;
     let receiver;
     let configurationChanged;
@@ -39,7 +40,7 @@ test('activation wires isolated commands; updates all three providers without to
         },
         Uri: { joinPath: (u, ...parts) => ({ fsPath: path.join(u.fsPath, ...parts) }) },
         env: { remoteName: 'wsl', language: 'en' },
-        extensions: { getExtension: () => undefined },
+        extensions: { getExtension: (id) => id === 'google.google-antigravity' ? officialAntigravity : undefined },
         workspace: {
             workspaceFolders: [],
             getConfiguration: (section) => {
@@ -77,6 +78,11 @@ test('activation wires isolated commands; updates all three providers without to
         }
     };
     const fakeAgy = class {
+        constructor(_log, getOfficialApi) {
+            assert.equal(getOfficialApi(), null);
+            officialAntigravity.isActive = true;
+            assert.equal(getOfficialApi(), officialAntigravity.exports);
+        }
         async getStatus() {
             return { email: 'private@example.com', planName: 'Pro' };
         }
@@ -286,7 +292,7 @@ test('activation wires isolated commands; updates all three providers without to
         receiver({ type: 'signIn' });
         await commands.get('nexusAiUsage.showDiagnostics')();
         assert.doesNotMatch(logs.join(''), /private@example/);
-        assert.doesNotMatch(logs.join(''), /private diagnostic/);
+        assert.doesNotMatch(logs.join(''), /private diagnostic|private fixture token/);
     } finally {
         monitor?.dispose();
         for (const d of context.subscriptions) d.dispose();

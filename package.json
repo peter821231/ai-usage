@@ -2,7 +2,7 @@
   "name": "nexus-ai-usage",
   "displayName": "%manifest.displayName%",
   "description": "%manifest.description%",
-  "version": "0.1.21",
+  "version": "0.1.22",
   "publisher": "nexus-ai-usage-local",
   "license": "MIT",
   "repository": {

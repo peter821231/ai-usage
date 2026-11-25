@@ -1,5 +1,12 @@
 # AI Usage changelog
 
+## 0.1.22 — 2026-11-25 (Preview)
+
+- Restore Antigravity quota readings in WSL by using the loopback connection
+  published by the active Google Antigravity extension.
+- Report the Antigravity connection method and a sanitized discovery error in
+  Diagnostics.
+
 ## 0.1.21 — 2026-11-25 (Preview)
 
 - Display the Antigravity pools and quota windows reported by the local service.
