@@ -10,7 +10,8 @@ const LABEL_KEYS = new Set([
     'refresh.pauseWhenUnfocused', 'context.show', 'statusBar.show', 'statusBar.compact',
     'antigravity.statusBar.geminiFiveHour', 'antigravity.statusBar.geminiWeekly',
     'antigravity.statusBar.claudeGptFiveHour', 'antigravity.statusBar.claudeGptWeekly',
-    'antigravity.statusBar.argonWeekly', 'claudeCode.timeoutSeconds', 'claudeCode.enterpriseResetSchedule'
+    'antigravity.statusBar.argonWeekly', 'antigravity.statusBar.otherWindows',
+    'claudeCode.timeoutSeconds', 'claudeCode.enterpriseResetSchedule'
 ]);
 const NEEDS = Object.fromEntries(
     [...LABEL_KEYS]

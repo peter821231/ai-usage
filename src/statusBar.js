@@ -10,22 +10,26 @@ const AG_STATUS_WINDOWS = [
     { key: 'geminiWeekly', groupType: 'gemini', windowType: 'weekly', default: true },
     { key: 'claudeGptFiveHour', groupType: 'claudeGpt', windowType: 'fiveHour', default: false },
     { key: 'claudeGptWeekly', groupType: 'claudeGpt', windowType: 'weekly', default: false },
-    { key: 'argonWeekly', groupType: 'argon', windowType: 'weekly', default: true }
+    { key: 'argonWeekly', groupType: 'argon', windowType: 'weekly', default: true },
+    { key: 'otherWindows', default: false }
 ];
 const english = createI18n('en');
 const translator = (view) => view.i18n ? createTranslator(view.i18n) : english;
 function selectStatusProvider(provider, choices = {}) {
     if (provider.id !== 'antigravity') return provider;
-    const enabled = AG_STATUS_WINDOWS.filter((choice) =>
+    const enabled = new Set(AG_STATUS_WINDOWS.filter((choice) =>
         typeof choices[choice.key] === 'boolean' ? choices[choice.key] : choice.default
-    );
+    ).map((choice) => choice.key));
     return {
         ...provider,
         groups: provider.groups.map((group) => ({
             ...group,
-            rows: group.rows.filter((row) => enabled.some((choice) =>
-                choice.groupType === group.groupType && choice.windowType === row.windowType
-            ))
+            rows: group.rows.filter((row) => {
+                const choice = AG_STATUS_WINDOWS.find((choice) =>
+                    choice.groupType && choice.groupType === group.groupType && choice.windowType === row.windowType
+                );
+                return enabled.has(choice?.key ?? 'otherWindows');
+            })
         })).filter((group) => group.rows.length)
     };
 }

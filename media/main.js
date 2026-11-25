@@ -236,7 +236,8 @@
         const text = el('span', 'provider-label');
         text.append(el('span', 'provider-title', p.title));
         const rows = p.groups.flatMap((g) => g.rows);
-        const hasData = typeof p.spend?.used === 'number' || rows.some((r) => r.usedPct !== null);
+        const hasData = typeof p.spend?.used === 'number' || rows.some((r) => r.usedPct !== null)
+            || (p.id === 'antigravity' && Boolean(p.observedAt));
         const issue = p.error || p.spend?.status === 'unsupported';
         const stale = p.spend?.stale || rows.some((r) => r.stale && !r.recordedOnly && r.usedPct !== null);
         const recorded = rows.some((r) => r.recordedOnly);
@@ -279,7 +280,7 @@
             count += g.rows.length;
         }
         if (p.spend && p.primaryMetric === 'quota') body.append(spend(p.spend));
-        if (!p.spend && !count) body.append(el('p', 'problem', t('quota.empty')));
+        if (!p.spend && !count && !p.notice) body.append(el('p', 'problem', t('quota.empty')));
         if (state.showContext && p.context) body.append(contextView(p.context));
         if (p.credits && Object.keys(p.credits).length) {
             const credits = el('div', 'credits');

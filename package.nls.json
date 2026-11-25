@@ -33,6 +33,7 @@
   "manifest.setting.antigravity.statusBar.claudeGptFiveHour.description": "Show Claude and GPT models 5-hour in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
   "manifest.setting.antigravity.statusBar.claudeGptWeekly.description": "Show Claude and GPT models weekly in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
   "manifest.setting.antigravity.statusBar.argonWeekly.description": "Show Gemini 4 Argon weekly in the status bar. Only changes the selected summary; the hover and dashboard retain all limits. Deselect every window to omit Antigravity from the status bar.",
+  "manifest.setting.antigravity.statusBar.otherWindows.description": "Include detected Antigravity quota windows without an individual setting in the status bar.",
   "manifest.setting.claudeCode.enable.description": "Monitor this provider in this extension host.",
   "manifest.setting.claudeCode.showInStatusBar.description": "Include this provider in the status bar. If unset, automatically show it when quota or spend data is found.",
   "manifest.setting.claudeCode.timeoutSeconds.description": "Maximum time for the official CLI usage query.",

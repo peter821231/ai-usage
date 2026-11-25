@@ -58,7 +58,18 @@ function view() {
                         {
                             id: 'gemini',
                             name: 'Gemini Models',
-                            windows: [{ id: '5', name: '5-hour', remainingPct: 90 }]
+                            windows: [
+                                { id: '5', name: '5-hour', remainingPct: 90 },
+                                { id: 'wk', name: 'Weekly', remainingPct: null }
+                            ]
+                        },
+                        {
+                            id: 'third-party',
+                            name: 'Claude and GPT models',
+                            windows: [
+                                { id: '5', name: '5-hour', remainingPct: null },
+                                { id: 'wk', name: 'Weekly', remainingPct: null }
+                            ]
                         },
                         {
                             id: 'argon',

@@ -249,26 +249,36 @@ function windowName(label, window) {
     if (/five[\s-]*hour|\b5[\s-]*h/i.test(label)) return '5-hour';
     if (/week|\b7[\s-]*d/i.test(label)) return 'Weekly';
     if (/daily|\bday\b|24[\s-]*h/i.test(label)) return 'Daily';
-    return s || label.replace(/\s*limit\s*(remaining)?\s*$/i, '').trim() || 'Limit';
+    return s || label.replace(/\s*limit\s*(remaining)?\s*$/i, '').trim() || secs?.[0] || 'Limit';
 }
 
 // RetrieveUserQuotaSummary: per-group 5-hour / weekly buckets, as in Antigravity's View Usage.
 function parseQuotaSummary(raw) {
     const r = raw && raw.response;
     if (!r || typeof r !== 'object') return null;
-    let groups = Array.isArray(r.groups) ? r.groups : [];
-    if (!groups.length && Array.isArray(r.buckets)) groups = [{ displayName: 'Antigravity', buckets: r.buckets }];
+    let groups = r.groups;
+    if ((!Array.isArray(groups) || !groups.length) && Array.isArray(r.buckets))
+        groups = [{ displayName: 'Antigravity', buckets: r.buckets }];
+    if (!Array.isArray(groups)) return null;
+    let malformed = false;
     const usedIds = new Set();
     const out = [];
     for (const g of groups) {
-        if (!g || typeof g !== 'object') continue;
+        if (!Array.isArray(g?.buckets)) {
+            malformed = true;
+            continue;
+        }
         const name = str(g.displayName, 100) || 'Models';
         let id = str(g.id, 100) || str(g.groupId, 100) || slug(name);
         while (usedIds.has(id)) id += '-x';
         usedIds.add(id);
         const windows = [];
-        for (const b of Array.isArray(g.buckets) ? g.buckets : []) {
-            if (!b || typeof b !== 'object' || b.disabled === true) continue;
+        for (const b of g.buckets) {
+            if (!b || typeof b !== 'object' || Array.isArray(b)) {
+                malformed = true;
+                continue;
+            }
+            if (b.disabled === true) continue;
             const wName = windowName(str(b.displayName, 100), str(b.window, 40));
             let wid = str(b.id, 100) || `${id}-${slug(wName)}`;
             while (windows.some((w) => w.id === wid)) wid += '-x';
@@ -286,7 +296,8 @@ function parseQuotaSummary(raw) {
         windows.sort((a, b) => rank(a) - rank(b));
         if (windows.length) out.push({ id, name, windows });
     }
-    return out.length ? out : null;
+    // Explicit empty bucket lists can replace old limits. Malformed empty summaries cannot.
+    return out.length || !malformed ? out : null;
 }
 
 // Only explicit identity can establish a relationship; matching values cannot.

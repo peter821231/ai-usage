@@ -239,7 +239,7 @@ class AgyClient {
         return parsed;
     }
 
-    // 5-hour and weekly limits per model group; keeps the last good answer on errors.
+    // Quota buckets per model group. Keeps the last good answer on errors.
     async getLimits(status) {
         const s = this.server;
         if (!s || !status) return null;
@@ -258,7 +258,7 @@ class AgyClient {
             const next = parseQuotaSummary(
                 await rpc(s.port, s.csrf, 'RetrieveUserQuotaSummary', !c ? { forceRefresh: true } : {}, 8000)
             );
-            if (!next) error = 'Quota summary contains no usable groups';
+            if (next === null) error = 'Quota summary contains no usable groups';
             else {
                 result = next;
                 fetchedAt = Date.now();

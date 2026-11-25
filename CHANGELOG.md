@@ -1,5 +1,13 @@
 # AI Usage changelog
 
+## 0.1.21 — 2026-11-25 (Preview)
+
+- Display the Antigravity pools and quota windows reported by the local service.
+  New pools appear automatically and a successful refresh removes absent windows.
+- Show **Unknown** for reported windows with missing or invalid percentages.
+  Failed refreshes retain the last successful quota readings and timestamps.
+- Add an optional **Other quota windows** setting for the Antigravity status bar.
+
 ## 0.1.20 — 2026-11-23 (Preview)
 
 - Query current Codex account limits through the official Codex App Server

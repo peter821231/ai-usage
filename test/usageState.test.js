@@ -6,7 +6,7 @@ const { friendlyGroup } = require('../src/util');
 const { parseQuotaSummary } = require('../src/parse');
 const now = Date.parse('2026-11-16T02:00:00Z');
 
-test('same quota and reset never combine Gemini with Argon; full five expected rows exist', () => {
+test('same quota and reset never combine Gemini with Argon or add unreported windows', () => {
     const groups = parseQuotaSummary({
         response: {
             groups: ['Gemini Models', 'Claude and GPT models', 'Gemini 4 Argon'].map((displayName, i) => ({
@@ -18,9 +18,10 @@ test('same quota and reset never combine Gemini with Argon; full five expected r
     });
     const p = buildUsageState({ antigravity: { data: { groups }, observedAt: now } }, now).providers[0];
     assert.equal(p.groups.length, 3);
-    assert.equal(p.groups.flatMap((g) => g.rows).length, 5);
-    assert.equal(new Set(p.groups.flatMap((g) => g.rows.map((r) => r.id))).size, 5);
-    assert.equal(p.groups[0].rows.find((r) => r.label === '5-hour').usedPct, null);
+    const rows = p.groups.flatMap((g) => g.rows);
+    assert.equal(rows.length, 3);
+    assert.equal(new Set(rows.map((r) => r.id)).size, 3);
+    assert.ok(rows.every((r) => r.label === 'Weekly'));
     assert.equal(friendlyGroup('Gemini 4 Argon'), 'Argon');
     assert.equal(friendlyGroup('Gemini Experimental X'), 'Gemini Experimental X');
 });

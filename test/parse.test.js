@@ -232,6 +232,20 @@ test('parseQuotaSummary reads 5-hour and weekly buckets per model group', () => 
     assert.strictEqual(p.parseQuotaSummary({ response: { groups: 'x' } }), null);
 });
 
+test('explicit empty quota lists differ from malformed lists', () => {
+    for (const response of [
+        { groups: [] },
+        { buckets: [] },
+        { groups: [{ buckets: [] }] },
+        { groups: [{ buckets: [{ disabled: true }] }] }
+    ]) {
+        assert.deepEqual(p.parseQuotaSummary({ response }), []);
+    }
+    for (const response of [{}, { groups: [{}] }, { groups: [{ buckets: [null] }] }]) {
+        assert.equal(p.parseQuotaSummary({ response }), null);
+    }
+});
+
 test('group relationships require explicit identity rather than matching values', () => {
     const groups = [{ id: 'gemini', name: 'Gemini Models', windows: [{ remainingPct: 50 }] }];
     assert.strictEqual(p.limitsMatch([{ id: 'argon', name: 'Gemini 4 Argon', remainingPct: 50 }], groups), false);

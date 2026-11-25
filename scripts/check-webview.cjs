@@ -11,7 +11,7 @@ const buildUsageState = (input, now) => localizeView(buildRawUsageState(input, n
 require('./locales.cjs').check();
 const { settingsView } = require(root + '/src/settingsUi');
 const { parseUsage } = require(root + '/src/claudeUsage');
-const { parseGeneratorMetadata } = require(root + '/src/parse');
+const { parseGeneratorMetadata, parseQuotaSummary } = require(root + '/src/parse');
 const { personalUsage, extraUsage } = require(root + '/test/fixtures/personal-claude.cjs');
 const original = Module._load;
 Module._load = function (key, ...args) {
@@ -215,7 +215,7 @@ const server = http.createServer((req, res) => {
     if (!(await page.locator('.status-bar-note').textContent()).includes('space is limited'))
         throw Error('Missing status-bar space/selection explanation');
     const chosen = (key) => page.locator(`input[data-focus="setting:antigravity.statusBar.${key}"]`);
-    for (const [key, expected] of [['geminiFiveHour', true], ['geminiWeekly', true], ['claudeGptFiveHour', false], ['claudeGptWeekly', false], ['argonWeekly', true]]) {
+    for (const [key, expected] of [['geminiFiveHour', true], ['geminiWeekly', true], ['claudeGptFiveHour', false], ['claudeGptWeekly', false], ['argonWeekly', true], ['otherWindows', false]]) {
         if ((await chosen(key).isChecked()) !== expected)
             throw Error('Wrong default summary selection: ' + key);
     }
@@ -238,6 +238,9 @@ const server = http.createServer((req, res) => {
     await chosen('claudeGptFiveHour').setChecked(true);
     if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'antigravity.statusBar.claudeGptFiveHour' && m.value === true))))
         throw Error('Antigravity summary choice not wired');
+    await chosen('otherWindows').setChecked(true);
+    if (!(await page.evaluate(() => window.__messages.some((m) => m.type === 'setSetting' && m.key === 'antigravity.statusBar.otherWindows' && m.value === true))))
+        throw Error('Other quota windows choice not wired');
     const compactMode = page.getByRole('checkbox', { name: 'Compact mode' });
     if (await compactMode.isChecked()) throw Error('Compact mode should default to off');
     await compactMode.setChecked(true);
@@ -423,6 +426,23 @@ const server = http.createServer((req, res) => {
     const sendState = (value) => page.evaluate(
         (s) => window.dispatchEvent(new MessageEvent('message', { data: { type: 'state', state: s } })), value
     );
+    const quotaState = (groups) => buildUsageState({
+        antigravity: { data: { groups: parseQuotaSummary({ response: { groups } }) }, observedAt: now }
+    }, now);
+    await sendState(quotaState([
+        { displayName: 'Gemini Models', buckets: [{ displayName: 'Weekly' }] },
+        { displayName: 'New model pool', buckets: [{ displayName: 'Daily', remainingFraction: 0.7 }] }
+    ]));
+    if (await card.getByRole('heading', { name: 'Gemini 4 Argon', exact: true }).count())
+        throw Error('Removed Argon pool is still visible');
+    if (!(await card.getByRole('heading', { name: 'New model pool', exact: true }).isVisible()))
+        throw Error('New quota pool did not appear');
+    if (await card.locator('.quota').count() !== 2 || await card.locator('.unknown-value').count() !== 1)
+        throw Error('Only reported quota windows should be visible');
+    await sendState(quotaState([]));
+    if (await card.locator('.quota').count() || !(await card.getByText('Antigravity reported no active quota windows.').isVisible()))
+        throw Error('Empty quota summary did not clear the reported windows');
+
     const team = buildUsageState({ claude: { data: parseUsage({
         subscription_type: 'team', rate_limits: {
             five_hour: { utilization: 13 },
@@ -543,7 +563,7 @@ const server = http.createServer((req, res) => {
             personalSubscriptions: ['pro', 'max'],
             personalUsageFormats: ['legacy', 'limits'],
             personalExtraUsage: ['absent', 'supported', 'unsupported'],
-            statusBarWindowChoices: 5,
+            statusBarWindowChoices: 6,
             codexRecordedDataNeutral: true,
             languages: ['en', 'zh-TW'],
             languageSwitchPreservesFocusAndDetails: true,
