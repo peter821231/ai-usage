@@ -36,6 +36,7 @@ function run(cmd, args, timeout = 6000) {
 }
 
 function rpc(port, csrf, name, body, timeout = 4000) {
+    let deadline;
     return new Promise((resolve, reject) => {
         const payload = JSON.stringify(body || {});
         const req = http.request(
@@ -44,7 +45,8 @@ function rpc(port, csrf, name, body, timeout = 4000) {
                 port,
                 path: RPC_PATH + name,
                 method: 'POST',
-                timeout,
+                // Keep the session token off any proxy configured for the extension host.
+                agent: false,
                 headers: {
                     'Content-Type': 'application/json',
                     'Content-Length': Buffer.byteLength(payload),
@@ -53,15 +55,24 @@ function rpc(port, csrf, name, body, timeout = 4000) {
                 }
             },
             (res) => {
+                res.on('error', reject);
+                if (res.statusCode !== 200) {
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                    req.destroy();
+                    return;
+                }
                 const chunks = [];
                 let size = 0;
                 res.on('data', (c) => {
                     size += c.length;
-                    if (size > MAX_BODY_BYTES) return req.destroy(new Error('RESPONSE_TOO_LARGE'));
+                    if (size > MAX_BODY_BYTES) {
+                        reject(new Error('RESPONSE_TOO_LARGE'));
+                        req.destroy();
+                        return;
+                    }
                     chunks.push(c);
                 });
                 res.on('end', () => {
-                    if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
                     try {
                         resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
                     } catch (e) {
@@ -71,9 +82,12 @@ function rpc(port, csrf, name, body, timeout = 4000) {
             }
         );
         req.on('error', reject);
-        req.on('timeout', () => req.destroy(new Error('TIMEOUT')));
+        deadline = setTimeout(() => {
+            reject(new Error('TIMEOUT'));
+            req.destroy();
+        }, timeout);
         req.end(payload);
-    });
+    }).finally(() => clearTimeout(deadline));
 }
 
 async function listProcesses() {
@@ -113,10 +127,16 @@ function firstOk(promises) {
 
 const NOOP_LOG = { info() {}, warn() {} };
 
+function sameConnection(previous, current) {
+    return !!previous && previous.kind === current.kind && previous.pid === current.pid
+        && previous.port === current.port && previous.csrf === current.csrf;
+}
+
 // Diagnostics never include the csrf token.
 class AgyClient {
-    constructor(log) {
+    constructor(log, getOfficialApi) {
         this.log = log || NOOP_LOG;
+        this.getOfficialApi = getOfficialApi;
         this.server = null;
         this.discovering = null;
         this.lastFailedDiscovery = 0;
@@ -199,7 +219,7 @@ class AgyClient {
                 this.fail(
                     procs.length
                         ? `found ${procs.length} process(es) but no port answered`
-                        : 'no agy or language server process found'
+                        : 'no compatible legacy Antigravity process found'
                 );
             }
             return found;
@@ -209,7 +229,18 @@ class AgyClient {
         return this.discovering;
     }
 
-    async getStatus() {
+    officialConnection() {
+        const api = this.getOfficialApi?.();
+        const port = api?.port;
+        const csrf = api?.csrfToken;
+        if (!Number.isInteger(port) || port < 1 || port > 65535 || typeof csrf !== 'string' || !csrf) return null;
+        const url = api.client?.serverUrl;
+        if (url && url !== `http://127.0.0.1:${port}` && url !== `http://localhost:${port}`) return null;
+        return { kind: 'ide-extension', port, csrf };
+    }
+
+    async getProcessStatus() {
+        if (this.server?.kind === 'ide-extension') this.server = null;
         let data = null;
         // Re-scan now and then: a newer agy session may be signed in to another account.
         if (this.server && Date.now() - this.lastDiscoveryAt > REDISCOVER_MS) {
@@ -224,28 +255,44 @@ class AgyClient {
                 this.server = null;
             }
         }
-        if (!data || !data.userStatus) {
-            const found = await this.discover();
-            if (!found) return null;
-            data = found.data;
+        return data?.userStatus ? data : (await this.discover())?.data;
+    }
+
+    async getStatus() {
+        const official = this.officialConnection();
+        let data;
+        if (official) {
+            data = await rpc(official.port, official.csrf, 'GetUserStatus', META).catch(() => null);
+            if (!data?.userStatus) {
+                this.server = null;
+                this.fail('IDE extension endpoint did not return user status');
+                return null;
+            }
+            if (!sameConnection(this.server, official)) this.server = official;
+        } else {
+            data = await this.getProcessStatus();
+            if (!data) return null;
         }
         const parsed = parseUserStatus(data);
         if (parsed) {
+            this.account = parsed.email.trim().toLowerCase();
             this.diag.lastOkAt = Date.now();
             this.diag.lastError = '';
         } else {
+            this.server = null;
             this.fail('server answered without user status');
         }
         return parsed;
     }
 
-    // 5-hour and weekly limits per model group; keeps the last good answer on errors.
+    // Quota buckets per model group. Keeps the last good answer on errors.
     async getLimits(status) {
         const s = this.server;
         if (!s || !status) return null;
-        const key = `${s.pid}|${String(status.email || '').toLowerCase()}`;
+        const account = status.email.trim().toLowerCase();
         const now = Date.now();
-        const c = this.limitsCache && this.limitsCache.key === key ? this.limitsCache : null;
+        const cached = this.limitsCache;
+        const c = cached?.account === account && sameConnection(cached.server, s) ? cached : null;
         if (c && now - c.at < (c.error ? LIMITS_RETRY_MS : LIMITS_MIN_GAP_MS)) {
             this.limitsFetchedAt = c.fetchedAt;
             this.limitsError = c.error;
@@ -258,7 +305,7 @@ class AgyClient {
             const next = parseQuotaSummary(
                 await rpc(s.port, s.csrf, 'RetrieveUserQuotaSummary', !c ? { forceRefresh: true } : {}, 8000)
             );
-            if (!next) error = 'Quota summary contains no usable groups';
+            if (next === null) error = 'Quota summary contains no usable groups';
             else {
                 result = next;
                 fetchedAt = Date.now();
@@ -266,7 +313,7 @@ class AgyClient {
         } catch {
             error = 'Quota summary request failed';
         }
-        this.limitsCache = { key, at: now, fetchedAt, result, error };
+        this.limitsCache = { account, server: s, at: now, fetchedAt, result, error };
         this.limitsFetchedAt = fetchedAt;
         this.limitsError = error;
         this.diag.limits = error || 'available';
@@ -280,10 +327,11 @@ class AgyClient {
         const picked = pickTrajectory(traj && traj.trajectorySummaries, wsPaths);
         if (!picked) return null;
         const c = this.ctxCache;
-        if (c && c.id === picked.id && c.time === picked.time && c.port === s.port) return c.result;
+        if (c && c.id === picked.id && c.time === picked.time && c.account === this.account && sameConnection(c.server, s))
+            return c.result;
         const meta = await rpc(s.port, s.csrf, 'GetCascadeTrajectoryGeneratorMetadata', { cascade_id: picked.id });
         const result = parseGeneratorMetadata(meta, modelLabels, picked);
-        this.ctxCache = { id: picked.id, time: picked.time, port: s.port, result };
+        this.ctxCache = { id: picked.id, time: picked.time, account: this.account, server: s, result };
         return result;
     }
 }

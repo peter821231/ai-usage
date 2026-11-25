@@ -33,6 +33,7 @@
   "manifest.setting.antigravity.statusBar.claudeGptFiveHour.description": "在狀態列顯示 Claude 與 GPT 模型 5 小時額度。此設定僅調整選取的摘要；滑鼠提示與儀表板仍保留所有額度。取消選取所有時段，可從狀態列隱藏 Antigravity。",
   "manifest.setting.antigravity.statusBar.claudeGptWeekly.description": "在狀態列顯示 Claude 與 GPT 模型每週額度。此設定僅調整選取的摘要；滑鼠提示與儀表板仍保留所有額度。取消選取所有時段，可從狀態列隱藏 Antigravity。",
   "manifest.setting.antigravity.statusBar.argonWeekly.description": "在狀態列顯示 Gemini 4 Argon 每週額度。此設定僅調整選取的摘要；滑鼠提示與儀表板仍保留所有額度。取消選取所有時段，可從狀態列隱藏 Antigravity。",
+  "manifest.setting.antigravity.statusBar.otherWindows.description": "在狀態列顯示自動偵測到且沒有獨立設定的 Antigravity 額度時段。",
   "manifest.setting.claudeCode.enable.description": "在此擴充套件執行環境監控此供應商。",
   "manifest.setting.claudeCode.showInStatusBar.description": "在狀態列顯示此供應商。若未設定，讀到額度或支出資料時會自動顯示。",
   "manifest.setting.claudeCode.timeoutSeconds.description": "官方 CLI 用量查詢的最長等待時間。",

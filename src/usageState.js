@@ -3,16 +3,11 @@
 const { resetTime } = require('./claudeUsage');
 const { spendReset } = require('./resetPolicy');
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
-const EXPECTED = [
-    ['Gemini Models', 'Gemini', ['5-hour', 'Weekly']],
-    ['Claude and GPT models', 'Claude/GPT', ['5-hour', 'Weekly']],
-    ['Gemini 4 Argon', 'Argon', ['Weekly']]
-];
-const GROUP_TYPES = {
-    'Gemini Models': 'gemini',
-    'Claude and GPT models': 'claudeGpt',
-    'Gemini 4 Argon': 'argon'
-};
+const AG_GROUPS = new Map([
+    ['gemini models', { type: 'gemini', short: 'Gemini', order: 0 }],
+    ['claude and gpt models', { type: 'claudeGpt', short: 'Claude/GPT', order: 1 }],
+    ['gemini 4 argon', { type: 'argon', short: 'Argon', order: 2 }]
+]);
 const WINDOW_TYPES = { '5-hour': 'fiveHour', Weekly: 'weekly', Daily: 'daily', Limit: 'limit' };
 // Canonical names come from the parsers; translated labels never enter matching.
 function windowIdentity(label) {
@@ -72,66 +67,40 @@ function row(id, label, usedPct, resetAt, snapshot, ttl, now) {
 }
 
 function antigravityView(snapshot = {}, now = Date.now()) {
-    const groups = snapshot.data?.groups || [];
-    const result = [];
-    const seen = new Set();
-    for (const [name, short, windows] of EXPECTED) {
-        const matches = groups.filter((g) => g.name.toLowerCase().trim() === name.toLowerCase());
-        if (!matches.length) matches.push({ id: name, name, windows: [] });
-        for (const g of matches) {
-            seen.add(g);
-            const all = [...g.windows];
-            for (const name of windows)
-                if (!all.some((w) => w.name === name)) all.push({ id: name, name, remainingPct: null });
-            result.push({
-                id: g.id,
-                label: g.name,
-                groupType: GROUP_TYPES[name],
-                short,
-                rows: all.map((w) => ({
-                    ...row(
-                        `${g.id}:${w.id}`,
-                        w.name,
-                        finite(w.remainingPct) ? 100 - w.remainingPct : null,
-                        w.resetTime,
-                        snapshot,
-                        5 * 60000,
-                        now
-                    ),
-                    sourceLabel: g.name,
-                    resetBasis: 'provider',
-                    timeBasis: 'fetched'
-                }))
-            });
-        }
-    }
-    for (const g of groups)
-        if (!seen.has(g))
-            result.push({
-                id: g.id,
-                label: g.name,
-                short: g.name,
-                rows: g.windows.map((w) =>
-                    row(
-                        `${g.id}:${w.id}`,
-                        w.name,
-                        finite(w.remainingPct) ? 100 - w.remainingPct : null,
-                        w.resetTime,
-                        snapshot,
-                        5 * 60000,
-                        now
-                    )
-                )
-            });
+    const groups = (snapshot.data?.groups || [])
+        .map((group) => ({ group, known: AG_GROUPS.get(group.name.trim().toLowerCase()) }))
+        .sort((a, b) => (a.known?.order ?? AG_GROUPS.size) - (b.known?.order ?? AG_GROUPS.size))
+        .map(({ group, known }) => ({
+            id: group.id,
+            label: group.name,
+            groupType: known?.type,
+            short: known?.short || group.name,
+            rows: group.windows.map((w) => ({
+                ...row(
+                    `${group.id}:${w.id}`,
+                    w.name,
+                    finite(w.remainingPct) ? 100 - w.remainingPct : null,
+                    w.resetTime,
+                    snapshot,
+                    5 * 60000,
+                    now
+                ),
+                sourceLabel: group.name,
+                resetBasis: 'provider',
+                timeBasis: 'fetched'
+            }))
+        }));
     return {
         id: 'antigravity',
         title: 'Antigravity',
         source: 'Antigravity local quota summary',
         credits: snapshot.data?.credits || {},
         models: snapshot.data?.models || [],
-        groups: result,
+        groups,
         error: snapshot.error || '',
         errorKey: ERROR_KEYS[snapshot.error],
+        noticeKey: snapshot.data?.groups?.length === 0 && !snapshot.error ? 'quota.noActive' : null,
+        observedAt: snapshot.observedAt || null,
         plan: snapshot.data?.plan || '',
         context: snapshot.context || null,
         enabled: snapshot.enabled !== false

@@ -28,7 +28,10 @@ class Monitor {
     constructor(context) {
         this.context = context;
         this.home = os.homedir();
-        this.agy = new AgyClient();
+        this.agy = new AgyClient(undefined, () => {
+            const official = vscode.extensions.getExtension('google.google-antigravity');
+            return official?.isActive ? official.exports : null;
+        });
         this.codex = new CodexReader(this.home);
         this.claudeContext = new ClaudeContextReader(this.home);
         this.bar = new StatusBar();
@@ -102,12 +105,16 @@ class Monitor {
         try {
             const status = await this.agy.getStatus();
             if (!status) throw new Error('source-unavailable');
-            const groups = await this.agy.getLimits(status);
-            if (this.agIdentity && this.agIdentity !== status.email) {
+            const identity = status.email.trim().toLowerCase();
+            const session = this.agy.server;
+            if (this.agIdentity !== identity || (!identity && this.agSession !== session)) {
                 s.data = null;
                 s.observedAt = null;
+                s.context = null;
             }
-            this.agIdentity = status.email;
+            this.agIdentity = identity;
+            this.agSession = session;
+            const groups = await this.agy.getLimits(status);
             if (groups) {
                 s.data = {
                     groups,
@@ -123,6 +130,7 @@ class Monitor {
                 : null;
         } catch {
             s.error = 'agy-unavailable';
+            s.context = null;
         }
         s.checkedAt = Date.now();
         this.render();
@@ -256,6 +264,8 @@ class Monitor {
             codexCliPresent: !!findCodexCommand(codex?.extensionPath),
             codexLogsPresent: fs.existsSync(path.join(this.home, '.codex', 'sessions')),
             antigravityConnected: !!this.agy.server,
+            antigravityConnection: this.agy.server ? this.agy.server.kind || 'legacy-process' : null,
+            antigravityDiscoveryError: this.agy.diag?.lastError || '',
             sources: Object.fromEntries(
                 Object.entries(this.snapshots).map(([id, s]) => [
                     id,

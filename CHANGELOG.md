@@ -1,5 +1,24 @@
 # AI Usage changelog
 
+## 0.1.22 — 2026-11-25 (Preview)
+
+- Restore Antigravity quota readings in WSL by using the loopback connection
+  published by the active Google Antigravity extension.
+- Report the Antigravity connection method and a sanitized discovery error in
+  Diagnostics.
+- Keep local Antigravity requests off the host proxy and bound the time spent
+  waiting for a response.
+- Retain the previous quota snapshot after malformed summaries and clear old
+  readings when the account changes.
+
+## 0.1.21 — 2026-11-25 (Preview)
+
+- Display the Antigravity pools and quota windows reported by the local service.
+  New pools appear automatically and a successful refresh removes absent windows.
+- Show **Unknown** for reported windows with missing or invalid percentages.
+  Failed refreshes retain the last successful quota readings and timestamps.
+- Add an optional **Other quota windows** setting for the Antigravity status bar.
+
 ## 0.1.20 — 2026-11-23 (Preview)
 
 - Query current Codex account limits through the official Codex App Server

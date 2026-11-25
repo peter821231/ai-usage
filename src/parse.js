@@ -62,27 +62,35 @@ function slug(s) {
     );
 }
 
+function uniqueId(ids, base) {
+    let id = base;
+    let suffix = ids.get(base) || 0;
+    while (ids.has(id)) id = `${base}-${++suffix}`;
+    ids.set(id, 0);
+    ids.set(base, suffix);
+    return id;
+}
+
 // Model observations are distinct unless the provider explicitly identifies a shared pool.
 function parseUserStatus(raw) {
     const us = raw && raw.userStatus;
-    if (!us) return null;
+    if (!us || typeof us !== 'object' || Array.isArray(us)) return null;
     const configs = us.cascadeModelConfigData?.clientModelConfigs;
-    const modelLabels = {};
+    const modelLabels = Object.create(null);
     const pools = [];
-    const ids = new Set();
+    const ids = new Map();
     for (const c of Array.isArray(configs) ? configs : []) {
         if (!c || typeof c !== 'object') continue;
         const label = str(c.label, 100);
-        const model = c.modelOrAlias && str(c.modelOrAlias.model, 200);
+        const model = str(c.modelOrAlias?.model, 200);
+        const modelId = str(c.modelId, 200);
         if (model && label) modelLabels[model] = label;
-        if (c.modelId && label) modelLabels[str(c.modelId, 200)] = label;
+        if (modelId && label) modelLabels[modelId] = label;
         const q = c.quotaInfo || {};
         const frac = num(q.remainingFraction);
         const resetTime = typeof q.resetTime === 'string' && !isNaN(Date.parse(q.resetTime)) ? q.resetTime : null;
         if (!label || (frac === null && !resetTime)) continue;
-        let id = slug(str(c.modelId, 200) || model || label);
-        while (ids.has(id)) id += '-x';
-        ids.add(id);
+        const id = uniqueId(ids, slug(modelId || model || label));
         pools.push({
             id,
             name: label,
@@ -188,7 +196,7 @@ function pickTrajectory(summaries, wsPaths) {
 // gemini-3.8-flash-n -> "Gemini 3.8 Flash": match a known label, else title-case the id.
 function prettyModel(raw, modelLabels) {
     if (!raw || typeof raw !== 'string') return null;
-    if (modelLabels && modelLabels[raw]) return modelLabels[raw];
+    if (modelLabels && Object.hasOwn(modelLabels, raw)) return modelLabels[raw];
     const s = raw.replace(/^models[/_-]/i, '').replace(/-n$/i, '');
     if (/^MODEL_PLACEHOLDER_/i.test(s)) return null;
     const words = s
@@ -249,29 +257,30 @@ function windowName(label, window) {
     if (/five[\s-]*hour|\b5[\s-]*h/i.test(label)) return '5-hour';
     if (/week|\b7[\s-]*d/i.test(label)) return 'Weekly';
     if (/daily|\bday\b|24[\s-]*h/i.test(label)) return 'Daily';
-    return s || label.replace(/\s*limit\s*(remaining)?\s*$/i, '').trim() || 'Limit';
+    return s || label.replace(/\s*limit\s*(remaining)?\s*$/i, '').trim() || secs?.[0] || 'Limit';
 }
 
 // RetrieveUserQuotaSummary: per-group 5-hour / weekly buckets, as in Antigravity's View Usage.
 function parseQuotaSummary(raw) {
     const r = raw && raw.response;
     if (!r || typeof r !== 'object') return null;
-    let groups = Array.isArray(r.groups) ? r.groups : [];
-    if (!groups.length && Array.isArray(r.buckets)) groups = [{ displayName: 'Antigravity', buckets: r.buckets }];
-    const usedIds = new Set();
+    let groups = r.groups;
+    if ((!Array.isArray(groups) || !groups.length) && Array.isArray(r.buckets))
+        groups = [{ displayName: 'Antigravity', buckets: r.buckets }];
+    if (!Array.isArray(groups)) return null;
+    const usedIds = new Map();
     const out = [];
     for (const g of groups) {
-        if (!g || typeof g !== 'object') continue;
+        if (!Array.isArray(g?.buckets)) return null;
         const name = str(g.displayName, 100) || 'Models';
-        let id = str(g.id, 100) || str(g.groupId, 100) || slug(name);
-        while (usedIds.has(id)) id += '-x';
-        usedIds.add(id);
+        const id = uniqueId(usedIds, str(g.id, 100) || str(g.groupId, 100) || slug(name));
         const windows = [];
-        for (const b of Array.isArray(g.buckets) ? g.buckets : []) {
-            if (!b || typeof b !== 'object' || b.disabled === true) continue;
+        const usedWindowIds = new Map();
+        for (const b of g.buckets) {
+            if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
+            if (b.disabled === true) continue;
             const wName = windowName(str(b.displayName, 100), str(b.window, 40));
-            let wid = str(b.id, 100) || `${id}-${slug(wName)}`;
-            while (windows.some((w) => w.id === wid)) wid += '-x';
+            const wid = uniqueId(usedWindowIds, str(b.id, 100) || `${id}-${slug(wName)}`);
             windows.push({
                 id: wid,
                 name: wName,
@@ -286,7 +295,7 @@ function parseQuotaSummary(raw) {
         windows.sort((a, b) => rank(a) - rank(b));
         if (windows.length) out.push({ id, name, windows });
     }
-    return out.length ? out : null;
+    return out;
 }
 
 // Only explicit identity can establish a relationship; matching values cannot.

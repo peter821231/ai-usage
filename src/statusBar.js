@@ -10,22 +10,26 @@ const AG_STATUS_WINDOWS = [
     { key: 'geminiWeekly', groupType: 'gemini', windowType: 'weekly', default: true },
     { key: 'claudeGptFiveHour', groupType: 'claudeGpt', windowType: 'fiveHour', default: false },
     { key: 'claudeGptWeekly', groupType: 'claudeGpt', windowType: 'weekly', default: false },
-    { key: 'argonWeekly', groupType: 'argon', windowType: 'weekly', default: true }
+    { key: 'argonWeekly', groupType: 'argon', windowType: 'weekly', default: true },
+    { key: 'otherWindows', default: false }
 ];
 const english = createI18n('en');
 const translator = (view) => view.i18n ? createTranslator(view.i18n) : english;
 function selectStatusProvider(provider, choices = {}) {
     if (provider.id !== 'antigravity') return provider;
-    const enabled = AG_STATUS_WINDOWS.filter((choice) =>
+    const enabled = new Set(AG_STATUS_WINDOWS.filter((choice) =>
         typeof choices[choice.key] === 'boolean' ? choices[choice.key] : choice.default
-    );
+    ).map((choice) => choice.key));
     return {
         ...provider,
         groups: provider.groups.map((group) => ({
             ...group,
-            rows: group.rows.filter((row) => enabled.some((choice) =>
-                choice.groupType === group.groupType && choice.windowType === row.windowType
-            ))
+            rows: group.rows.filter((row) => {
+                const choice = AG_STATUS_WINDOWS.find((choice) =>
+                    choice.groupType && choice.groupType === group.groupType && choice.windowType === row.windowType
+                );
+                return enabled.has(choice?.key ?? 'otherWindows');
+            })
         })).filter((group) => group.rows.length)
     };
 }
@@ -139,7 +143,8 @@ class StatusBar {
         const label = visibleProviders.length
             ? `${visibleProviders.map((p) => summary(p, view.percentMode, i18n)).join(' | ')} · ${i18n.t(view.percentMode === 'left' ? 'quota.remaining.short' : 'quota.used.short')}`
             : i18n.t('status.hidden');
-        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${label}`;
+        const text = label.replace(/(?<!\\)\$\([a-z0-9-]+(?:~[a-z]+)?\)/gi, '\\$&');
+        this.item.text = options.compact ? QUOTA_ICON : `${QUOTA_ICON} ${text}`;
         this.item.tooltip = hover(view);
         this.item.accessibilityInformation = { label };
         this.item.backgroundColor = visibleProviders.some((p) => p.id === 'codex' ? !!p.error : !!marker(p))

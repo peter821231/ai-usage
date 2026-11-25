@@ -32,7 +32,7 @@ test('only known enum and boolean settings may be changed by a webview', () => {
 test('Antigravity summary defaults select both Gemini windows and independent Argon; choices are validated', () => {
     const items = settingsView(() => undefined).find((g) => g.title === 'Antigravity').items;
     const choices = items.filter((i) => i.key.startsWith('antigravity.statusBar.'));
-    assert.equal(choices.length, 5);
+    assert.equal(choices.length, 6);
     assert.deepEqual(choices.filter((i) => i.value).map((i) => i.key), [
         'antigravity.statusBar.geminiFiveHour', 'antigravity.statusBar.geminiWeekly', 'antigravity.statusBar.argonWeekly'
     ]);

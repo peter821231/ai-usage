@@ -54,6 +54,8 @@ test('parseGeneratorMetadata ignores non-string titles', () => {
         parseGeneratorMetadata(data, {}, { summary: { summary: { bad: 1 } }, time: 1 }).title,
         'Active conversation'
     );
+    const inherited = { generatorMetadata: [{ chatModel: { model: 'toString', usage: { inputTokens: 1 } } }] };
+    assert.strictEqual(parseGeneratorMetadata(inherited, {}, null).model, 'Tostring');
 });
 
 test('Codex preserves finite overage and rejects junk', () => {
@@ -104,7 +106,7 @@ test('rpc refuses oversized responses', async () => {
     }
 });
 
-test('rpc only talks to 127.0.0.1 and sends the csrf header', async () => {
+test('rpc sends the csrf header directly to 127.0.0.1, bypassing the global agent', async () => {
     let seen = null;
     const server = http.createServer((req, res) => {
         seen = { host: req.socket.localAddress, csrf: req.headers['x-codeium-csrf-token'] };
@@ -112,10 +114,37 @@ test('rpc only talks to 127.0.0.1 and sends the csrf header', async () => {
         res.end('{"ok":true}');
     });
     await new Promise((r) => server.listen(0, '127.0.0.1', r));
+    const originalAgent = http.globalAgent;
+    const globalAgent = new http.Agent();
+    globalAgent.createConnection = () => assert.fail('The global agent must never carry the local session token');
+    http.globalAgent = globalAgent;
     try {
         assert.deepStrictEqual(await rpc(server.address().port, 'tok', 'X', {}), { ok: true });
         assert.deepStrictEqual(seen, { host: '127.0.0.1', csrf: 'tok' });
     } finally {
+        http.globalAgent = originalAgent;
+        globalAgent.destroy();
         await new Promise((r) => server.close(r));
+    }
+});
+
+test('rpc settles when the reply stalls past its deadline or aborts during the body', async () => {
+    const server = http.createServer((req, res) => {
+        res.writeHead(200);
+        res.write(' ');
+        if (req.url.endsWith('/Abort')) {
+            setImmediate(() => res.destroy());
+            return;
+        }
+        const drip = setInterval(() => res.write(' '), 10);
+        res.once('close', () => clearInterval(drip));
+    });
+    await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+    try {
+        const port = server.address().port;
+        await assert.rejects(rpc(port, 'fixture', 'Wait', {}, 100), /^Error: TIMEOUT$/);
+        await assert.rejects(rpc(port, 'fixture', 'Abort', {}, 1000), /aborted|socket hang up/);
+    } finally {
+        await new Promise((resolve) => server.close(resolve));
     }
 });

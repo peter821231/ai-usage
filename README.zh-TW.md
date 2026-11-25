@@ -10,10 +10,10 @@
 `nexus-ai-usage-local.nexus-ai-usage`，不會取代 Quota Nexus 或移轉其資料。
 這是非官方專案，與 Google、Anthropic 或 OpenAI 均無隸屬關係。
 
-## 0.1.20 預覽版
+## 0.1.22 預覽版
 
-不用開新對話，AI Usage 就能向官方 Codex App Server 查詢帳戶額度。
-預設每分鐘更新一次，也可以手動重新整理。本機工作階段記錄可供備援。 [版本變更紀錄](CHANGELOG.md)
+AI Usage 透過已啟用的 Google Antigravity 擴充套件提供的本機連線讀取額度，包含 WSL 環境。
+額度池依本機摘要更新，開啟「其他額度時段」即可在狀態列顯示新偵測到的時段。 [版本變更紀錄](CHANGELOG.md)
 
 ## 介面預覽
 
@@ -79,13 +79,13 @@ Codex 的 **Last recorded（最近記錄）** 保留事件原始時間；一般�
 
 ## 功能
 
-- **Antigravity**：Gemini Models 的 5 小時及每週額度、Claude 與 GPT 模型的 5 小時及每週額度，以及 Gemini 4 Argon 的每週額度。即使用量百分比與重設時間相同，也會保留完整的群組識別資訊。
+- **Antigravity** 依本機額度摘要顯示額度池和時段。新池會自動出現，成功重新整理時也會移除來源已停止回報的時段。即使用量百分比與重設時間相同，各池也保有自己的識別資訊。
 - **Claude Pro / Max 與 Team（合成資料測試）**：顯示來源提供的 5 小時、每週及個別模型額度，各自保有重設時間。即使啟用額外用量，狀態列、展開卡片及收合預覽仍以訂閱額度為主。額外支出放在獨立的預算區塊；缺少的數值維持 **Unknown（未知）**。
 - **Claude Enterprise**：透過已安裝的官方 Claude Code CLI，取得實際帳戶支出、來源提供的上限、剩餘金額及預算使用百分比。上限不會寫死為 200 美元。畫面描述的是帳戶用量，不宣稱這是一份僅計算 Claude Code 的獨立帳單。
 - **Codex**：即使 Codex 閒置，仍會向官方 Codex App Server 查詢帳戶額度與重設時間。本機工作階段記錄可供備援。
 - 精簡的 AG / CC / CX 服務卡片，內含額度長條圖與重設倒數；卡片可收合，並在重新整理或重新載入網頁檢視後保留收合狀態。縮小標頭留白、列高與區塊間距，讓側邊欄能顯示更多用量，同時保留額度標籤、重設資訊，以及分開呈現的預算與對話脈絡。完整來源時間與確切重設時間，仍可在各卡片的 **Source & reset details（來源與重設詳細資訊）** 中展開檢視。模型標籤與 Antigravity 內部點數欄位無須額外查詢即可讀取；點數欄位的意義與尺度尚未和官方用量介面核對，不能視為已確認的可用額度。
 - 狀態列的懸停提示提供精簡用量圖表，以及已用／剩餘數值。
-- Antigravity 狀態摘要預設顯示 **Gemini Models 5-hour / Weekly** 及獨立的 **Gemini 4 Argon Weekly**。五個布林選項可分別選擇是否顯示各週期；僅影響摘要，不影響完整懸停提示或儀表板。
+- Antigravity 狀態摘要預設顯示來源有回報的 **Gemini 模型 5 小時／每週** 以及 **Gemini 4 Argon 每週**。開啟「其他額度時段」可在摘要加入自動偵測到的額度時段。懸停提示和儀表板會顯示來源回報的所有時段。
 - 提供單一狀態列摘要與詳細面板。百分比預設顯示**已用**，面板也會顯示**剩餘**。對話脈絡是可選的獨立詳細資訊區塊，預設關閉。
 - 缺少讀數時顯示 **Unknown**。查詢失敗會保留最近一次成功的讀數並顯示錯誤。過時讀數仍會顯示，並附上來源時間。超過重設時間不會自動將觀測值改成 0% 或 100%。
 - 明確顯示確切重設時間、倒數與時區。對已驗證的 Enterprise 月方案，若 CLI 未提供重設時間，會依讀數時間計算下一個 UTC 曆月的起點，並標示為 **official monthly rule（官方每月規則）**，不會將其呈現為 CLI 回傳的重設時間戳記。
@@ -199,14 +199,13 @@ Pro / Max 與 Team 仍待使用已登入的帳戶實際比對。
 - `context.show`：可選的對話脈絡區塊，預設關閉。
 - `statusBar.show`，以及各服務的 `enable` 與 `showInStatusBar`。未設定 `showInStatusBar` 時，讀到額度或支出資料後，該服務會自動顯示。手動設定優先。
 - `statusBar.compact`：只顯示額度儀表圖示，預設關閉。
-- `antigravity.statusBar.*` 下的 `geminiFiveHour`、`geminiWeekly`、`argonWeekly` 預設開啟；`claudeGptFiveHour`、`claudeGptWeekly` 預設關閉。
+- `antigravity.statusBar.*` 下的 `geminiFiveHour`、`geminiWeekly`、`argonWeekly` 預設開啟。`claudeGptFiveHour`、`claudeGptWeekly` 和 `otherWindows` 預設關閉。
 - `claudeCode.timeoutSeconds`：15、30、45（預設）或 60 秒。
 - `claudeCode.enterpriseResetSchedule`：`monthlyUtc`（已驗證的每月 UTC 規則）或 `unknown`（僅採用來源）。依規則推算的日期會明確標示。
 
 狀態列標記：`~` 代表過時、`!` 代表錯誤／不支援的金額格式、`?` 代表缺少額度。
 只有納入狀態列的服務會影響警示背景。隱藏所有服務時，狀態列項目也會隱藏；項目的懸停提示提供完整監看資訊。
-Antigravity 摘要會顯示所選週期名稱，包含數值為 Unknown 的項目；取消全部五個選項後，狀態列便不會顯示 Antigravity。
-懸停提示與面板仍保留所有監看的週期，包括狀態列未選取的項目。
+Antigravity 摘要顯示符合設定且來源有回報的時段。來源有回報時段但缺少百分比時，顯示 **Unknown（未知）**。取消勾選所有時段，即可從狀態列隱藏 Antigravity。
 
 狀態列空間由 IDE 與其他擴充套件共用，能顯示多少內容取決於寬度、字型／縮放比例及其他項目。
 此擴充套件不宣稱有固定的字元數上限，也不會默默截斷數值。請選擇需要的摘要。

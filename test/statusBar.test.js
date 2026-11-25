@@ -58,7 +58,18 @@ function view() {
                         {
                             id: 'gemini',
                             name: 'Gemini Models',
-                            windows: [{ id: '5', name: '5-hour', remainingPct: 90 }]
+                            windows: [
+                                { id: '5', name: '5-hour', remainingPct: 90 },
+                                { id: 'wk', name: 'Weekly', remainingPct: null }
+                            ]
+                        },
+                        {
+                            id: 'third-party',
+                            name: 'Claude and GPT models',
+                            windows: [
+                                { id: '5', name: '5-hour', remainingPct: null },
+                                { id: 'wk', name: 'Weekly', remainingPct: null }
+                            ]
                         },
                         {
                             id: 'argon',
@@ -197,6 +208,22 @@ test('unselected Antigravity windows do not color the selected summary', () => {
     assert.equal(items[0].visible, false);
     bar.update(v, { compact: true, hidden: ['antigravity'] });
     assert.equal(items[0].visible, false);
+});
+
+test('source quota labels display as text even when they contain theme icon syntax', () => {
+    const { StatusBar, items } = load();
+    const bar = new StatusBar();
+    const v = view();
+    const provider = v.providers[0];
+    provider.groups.push({
+        id: 'new',
+        label: 'New $(warning)',
+        short: 'New $(warning)',
+        rows: [provider.groups[0].rows[0]]
+    });
+    bar.update(v, { antigravityWindows: { otherWindows: true } });
+    assert.match(items[0].text, /^\$\(dashboard\) .*New \\\$\(warning\)/);
+    assert.match(items[0].accessibilityInformation.label, /New \$\(warning\)/);
 });
 
 test('old Codex records keep real values and reset time without a yellow idle warning; read errors still warn', () => {

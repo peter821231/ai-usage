@@ -12,12 +12,13 @@ This preview has a separate extension ID, commands, settings and cache:
 `nexus-ai-usage-local.nexus-ai-usage`. It does not replace or migrate Quota Nexus.
 It is unofficial and is not affiliated with Google, Anthropic or OpenAI.
 
-## 0.1.20 preview
+## 0.1.22 preview
 
-AI Usage now fetches Codex account limits from the official Codex App Server
-even when no conversation is active. It checks once a minute by default and
-also supports manual refresh. Local session records are available as a
-fallback. [Changelog](CHANGELOG.md)
+AI Usage reads Antigravity quotas through the active Google Antigravity
+extension's loopback connection, including in WSL. Quota pools follow the
+local summary, and **Other quota windows** adds newly detected windows to
+the status bar.
+[Changelog](CHANGELOG.md)
 
 ## UI preview
 
@@ -91,9 +92,10 @@ generate a template and add another language.
 
 ## Features
 
-- **Antigravity:** Gemini Models 5-hour and weekly; Claude and GPT models 5-hour
-  and weekly; Gemini 4 Argon weekly. Full group identity is preserved even when
-  percentages and reset times happen to match.
+- **Antigravity** uses the local quota summary to determine which pools and windows
+  appear. New pools appear automatically, and a successful refresh removes
+  windows the source no longer reports. Each pool keeps its own identity even
+  when percentages and reset times match.
 - **Claude Pro / Max and Team (fixture-tested):** source-provided 5-hour, weekly and model-scoped quotas
   with their own resets. Subscription quotas stay primary in the status bar,
   expanded card and collapsed preview, even with extra usage enabled. Additional
@@ -115,8 +117,9 @@ generate a template and add another language.
 - The status bar hover groups quota windows with a status dot, a segmented
   progress bar, the selected percentage and the reset time.
 - Antigravity's status summary defaults to **Gemini Models 5-hour / Weekly** and
-  independent **Gemini 4 Argon Weekly**. Five boolean choices let you include or
-  omit each window; these affect only the summary, not the full hover or dashboard.
+  **Gemini 4 Argon Weekly** whenever those windows are reported. Turn on
+  **Other quota windows** to include additional source-reported windows in the
+  summary. The hover and dashboard display all reported windows.
 - One status bar summary and a detailed panel. Percentages default to **used**;
   the panel also shows **remaining**. Conversation context is an optional,
   separate detail section, off by default.
@@ -264,7 +267,8 @@ Settings use only `nexusAiUsage.*`:
   available. An explicit setting overrides automatic visibility.
 - `statusBar.compact`: show only the quota gauge icon. Off by default.
 - Under `antigravity.statusBar.*`, `geminiFiveHour`, `geminiWeekly` and `argonWeekly`
-  are on by default; `claudeGptFiveHour` and `claudeGptWeekly` are off by default.
+  are on by default. `claudeGptFiveHour`, `claudeGptWeekly` and `otherWindows`
+  are off by default.
 - `claudeCode.timeoutSeconds`: 15, 30, 45 (default) or 60 seconds.
 - `claudeCode.enterpriseResetSchedule`: `monthlyUtc` (verified monthly UTC rule)
   or `unknown` (source-only). Rule-derived dates are visibly labelled.
@@ -272,9 +276,9 @@ Settings use only `nexusAiUsage.*`:
 Status bar markers: `~` stale, `!` error/unsupported money, `?` missing quota.
 Only providers included in the status bar affect its warning background. Hiding
 every provider hides the item; the hover still offers full monitored details.
-The Antigravity summary includes the selected windows by name, including Unknown
-values; deselecting all five omits Antigravity from the bar. Its hover and panel
-still include all monitored windows, even ones omitted from the status bar.
+The Antigravity summary includes reported windows that match your selections.
+A reported window with a missing percentage displays **Unknown**. Deselect
+every option to omit Antigravity from the bar.
 
 Status bar space is shared with the IDE and other extensions. Width, font/zoom
 and the other items determine what fits; this extension does not claim a fixed

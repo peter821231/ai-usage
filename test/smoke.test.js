@@ -19,6 +19,10 @@ test('activation wires isolated commands; updates all three providers without to
     let codexAppError = false;
     let codexSessionReads = 0;
     let antigravityPending;
+    const argon = { id: 'argon', name: 'Gemini 4 Argon', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 93 }] };
+    let antigravityGroups = [argon];
+    let antigravityEmail = 'private@example.com';
+    const officialAntigravity = { isActive: false, exports: { port: 1234, csrfToken: 'private fixture token' } };
     let provider;
     let receiver;
     let configurationChanged;
@@ -37,7 +41,7 @@ test('activation wires isolated commands; updates all three providers without to
         },
         Uri: { joinPath: (u, ...parts) => ({ fsPath: path.join(u.fsPath, ...parts) }) },
         env: { remoteName: 'wsl', language: 'en' },
-        extensions: { getExtension: () => undefined },
+        extensions: { getExtension: (id) => id === 'google.google-antigravity' ? officialAntigravity : undefined },
         workspace: {
             workspaceFolders: [],
             getConfiguration: (section) => {
@@ -75,13 +79,18 @@ test('activation wires isolated commands; updates all three providers without to
         }
     };
     const fakeAgy = class {
+        constructor(_log, getOfficialApi) {
+            assert.equal(getOfficialApi(), null);
+            officialAntigravity.isActive = true;
+            assert.equal(getOfficialApi(), officialAntigravity.exports);
+        }
         async getStatus() {
-            return { email: 'private@example.com', planName: 'Pro' };
+            return { email: antigravityEmail, planName: 'Pro' };
         }
         async getLimits() {
             await antigravityPending;
             this.limitsFetchedAt = Date.now();
-            return [{ id: 'argon', name: 'Gemini 4 Argon', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 93 }] }];
+            return antigravityGroups;
         }
     };
     const orig = Module._load;
@@ -245,6 +254,43 @@ test('activation wires isolated commands; updates all three providers without to
             assert.equal(barItem.command, 'nexusAiUsage.dashboard.focus');
             assert.match(barItem.tooltip.value, /Gemini 4 Argon/);
         }
+        const antigravity = () => posted.at(-1).state.providers.find((p) => p.id === 'antigravity');
+        const otherWindows = 'antigravity.statusBar.otherWindows';
+        await monitor.onMessage({ type: 'setSetting', key: 'antigravity.statusBar.argonWeekly', value: true });
+        antigravityGroups = [
+            { id: 'gemini', name: 'Gemini Models', windows: [{ id: 'wk', name: 'Weekly', remainingPct: null }] },
+            { id: 'new', name: 'New model pool', windows: [{ id: 'wk', name: 'Weekly', remainingPct: 74 }] }
+        ];
+        await monitor.readAntigravity();
+        assert.deepEqual(antigravity().groups.map((g) => g.label), ['Gemini Models', 'New model pool']);
+        assert.match(barItem.text, /Gemini wk Unknown/);
+        assert.doesNotMatch(barItem.text, /Argon|5h Unknown|New model pool/);
+        assert.match(barItem.tooltip.value, /New model pool/);
+        assert.doesNotMatch(barItem.tooltip.value, /Argon/);
+        assert.equal(settingValue(otherWindows), false);
+        await monitor.onMessage({ type: 'setSetting', key: otherWindows, value: true });
+        await monitor.onMessage({ type: 'setSetting', key: 'antigravity.statusBar.geminiWeekly', value: false });
+        monitor.render();
+        assert.match(barItem.text, /New model pool wk 26%/);
+        assert.doesNotMatch(barItem.text, /Gemini|Argon/);
+        assert.match(barItem.tooltip.value, /Gemini Models/);
+        antigravityGroups = [];
+        await monitor.readAntigravity();
+        assert.deepEqual(antigravity().groups, []);
+        assert.equal(antigravity().error, '');
+        assert.match(antigravity().notice, /no active quota windows/);
+        assert.doesNotMatch(barItem.text, /\bAG\b/);
+
+        antigravityEmail = '';
+        antigravityGroups = [argon];
+        await monitor.readAntigravity();
+        assert.equal(antigravity().groups[0].label, 'Gemini 4 Argon');
+        antigravityEmail = 'private@example.com';
+        antigravityGroups = null;
+        await monitor.readAntigravity();
+        assert.deepEqual(antigravity().groups, []);
+        assert.equal(monitor.snapshots.antigravity.observedAt, null);
+
         assert.equal(refreshes, 0, 'Changing compact mode must not query any provider');
         await monitor.onMessage({ type: 'setSetting', key: 'display.language', value: 'zh-TW' });
         configurationChanged({ affectsConfiguration: (key) => ['nexusAiUsage', 'nexusAiUsage.display.language'].includes(key) });
@@ -257,7 +303,7 @@ test('activation wires isolated commands; updates all three providers without to
         receiver({ type: 'signIn' });
         await commands.get('nexusAiUsage.showDiagnostics')();
         assert.doesNotMatch(logs.join(''), /private@example/);
-        assert.doesNotMatch(logs.join(''), /private diagnostic/);
+        assert.doesNotMatch(logs.join(''), /private diagnostic|private fixture token/);
     } finally {
         monitor?.dispose();
         for (const d of context.subscriptions) d.dispose();
